@@ -18,6 +18,11 @@ import {
 import api from "../utils/api";
 import MonthNav from "../components/MonthNav";
 import {
+  AlertTriangle, CheckCircle, XCircle,
+  FlaskConical, Search, PieChart as PieIcon, BarChart2,
+  TrendingUp, Lightbulb, MessageSquare, RefreshCw,
+} from "lucide-react";
+import {
   CATEGORIES,
   CAT_MAP,
   fmt,
@@ -115,7 +120,7 @@ function FinBot({ month }) {
   const [msgs, setMsgs] = useState([
     {
       role: "assistant",
-      content: `Hi! I'm FinBot 👋 Ask me anything about your ${monthLabel(month)} finances, stress score, or how to save money.`,
+      content: `Hi! I'm FinBot. Ask me anything about your ${monthLabel(month)} finances, stress score, or how to save money.`,
     },
   ]);
   const [input, setInput] = useState("");
@@ -142,7 +147,7 @@ function FinBot({ month }) {
     } catch {
       setMsgs((m) => [
         ...m,
-        { role: "assistant", content: "⚠️ Chat unavailable right now." },
+        { role: "assistant", content: "Chat unavailable right now. Please try again." },
       ]);
     }
     setLoading(false);
@@ -395,23 +400,22 @@ export default function AnalysisPage() {
             style={{ padding: "11px 28px", fontSize: 15 }}
           >
             {running
-              ? "🔄 Analysing…"
+              ? <><RefreshCw size={15} strokeWidth={2} style={{ animation: "spin .8s linear infinite" }} /> Analysing…</>
               : analysis
-                ? "🔄 Re-run Analysis"
-                : "🔬 Run Analysis"}
+                ? <><RefreshCw size={15} strokeWidth={2} /> Re-run Analysis</>
+                : <><FlaskConical size={15} strokeWidth={1.8} /> Run Analysis</>}
           </button>
         </div>
         {!hasData && (
-          <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 8 }}>
-            ⚠️ No data for {monthLabel(month)}.{" "}
-            <a href="/tracker" style={{ color: "var(--accent)" }}>
-              Add expenses in the Tracker →
-            </a>
+          <div style={{ fontSize: 13, color: "var(--text3)", marginTop: 8, display: "flex", alignItems: "center", gap: 5 }}>
+            <AlertTriangle size={13} strokeWidth={2} color="var(--amber)" />
+            No data for {monthLabel(month)}.{" "}
+            <a href="/tracker" style={{ color: "var(--accent)" }}>Add expenses in the Tracker →</a>
           </div>
         )}
         {error && (
-          <div className="ferr" style={{ marginTop: 8, fontSize: 14 }}>
-            ❌ {error}
+          <div className="ferr" style={{ marginTop: 8, fontSize: 14, display: "flex", alignItems: "center", gap: 5 }}>
+            <XCircle size={14} strokeWidth={2} /> {error}
           </div>
         )}
       </div>
@@ -422,7 +426,7 @@ export default function AnalysisPage() {
           className="card"
           style={{ textAlign: "center", padding: "3rem 2rem" }}
         >
-          <div style={{ fontSize: "3rem", marginBottom: "1rem" }}>🔬</div>
+          <FlaskConical size={48} strokeWidth={1.2} style={{ margin: "0 auto 1rem", display: "block", color: "var(--text3)" }} />
           <h2
             style={{
               fontFamily: "var(--serif)",
@@ -446,7 +450,7 @@ export default function AnalysisPage() {
           </p>
           {hasData && (
             <button className="btn btn-primary" onClick={runAnalysis}>
-              🔬 Run Analysis now →
+              <FlaskConical size={15} strokeWidth={1.8} /> Run Analysis now
             </button>
           )}
         </div>
@@ -468,13 +472,13 @@ export default function AnalysisPage() {
           <div className="card">
             <div className="tabs">
               {[
-                ["score", "🎯 Stress Score"],
-                ["shap", "🔍 SHAP Explainer"],
-                ["spending", "🥧 Spending"],
-                ["budget", "🎯 vs Budget"],
-                ["trends", "📈 Trends"],
-                ["suggestions", `💡 Tips (${sugs.length})`],
-                ["chat", "💬 FinBot"],
+                ["score",       <><TrendingUp  size={13} strokeWidth={1.8}/> Stress Score</>],
+                ["shap",        <><Search      size={13} strokeWidth={1.8}/> SHAP</>],
+                ["spending",    <><PieIcon     size={13} strokeWidth={1.8}/> Spending</>],
+                ["budget",      <><BarChart2   size={13} strokeWidth={1.8}/> vs Budget</>],
+                ["trends",      <><TrendingUp  size={13} strokeWidth={1.8}/> Trends</>],
+                ["suggestions", <><Lightbulb  size={13} strokeWidth={1.8}/> Tips ({sugs.length})</>],
+                ["chat",        <><MessageSquare size={13} strokeWidth={1.8}/> FinBot</>],
               ].map(([k, l]) => (
                 <button
                   key={k}
@@ -692,16 +696,9 @@ export default function AnalysisPage() {
                     ))}
                   </>
                 ) : (
-                  <div
-                    style={{
-                      padding: "1.5rem",
-                      background: "var(--surface2)",
-                      borderRadius: 8,
-                      fontSize: 13,
-                      color: "var(--text2)",
-                    }}
-                  >
-                    ⚠️ SHAP values not available — run{" "}
+                  <div style={{ padding: "1.5rem", background: "var(--surface2)", borderRadius: 8, fontSize: 13, color: "var(--text2)", display: "flex", alignItems: "center", gap: 8 }}>
+                    <AlertTriangle size={14} strokeWidth={2} color="var(--amber)" />
+                    SHAP values not available — run{" "}
                     <code>python ml/train.py</code> to enable the ML service.
                     Using rule-based fallback score.
                   </div>
@@ -724,14 +721,8 @@ export default function AnalysisPage() {
                     style={{ display: "flex", gap: "2rem", flexWrap: "wrap" }}
                   >
                     <div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text3)",
-                          marginBottom: 6,
-                        }}
-                      >
-                        🔴 Increasing your stress
+                      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--red)', display: 'inline-block' }} /> Increasing your stress
                       </div>
                       {ml?.topRiskFactors?.map((f, i) => (
                         <div
@@ -747,14 +738,8 @@ export default function AnalysisPage() {
                       ))}
                     </div>
                     <div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "var(--text3)",
-                          marginBottom: 6,
-                        }}
-                      >
-                        🟢 Reducing your stress
+                      <div style={{ fontSize: 11, color: "var(--text3)", marginBottom: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--green)', display: 'inline-block' }} /> Reducing your stress
                       </div>
                       {ml?.topPositiveFactors?.map((f, i) => (
                         <div
@@ -1090,10 +1075,10 @@ export default function AnalysisPage() {
                 <div key={i} className={`sug ${s.severity}`}>
                   <div className="sug-icon">
                     {s.severity === "danger"
-                      ? "🚨"
+                      ? <XCircle    size={18} strokeWidth={1.8} color="var(--red)" />
                       : s.severity === "warn"
-                        ? "⚠️"
-                        : "✅"}
+                        ? <AlertTriangle size={18} strokeWidth={1.8} color="var(--amber)" />
+                        : <CheckCircle  size={18} strokeWidth={1.8} color="var(--green)" />}
                   </div>
                   <div>
                     <div className="sug-title">{s.title}</div>

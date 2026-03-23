@@ -3,12 +3,28 @@
   "version": "2.0.0",
   "private": true,
   "dependencies": {
-    "react": "^18.2.0", "react-dom": "^18.2.0",
-    "react-router-dom": "^6.18.0", "axios": "^1.6.0",
-    "recharts": "^2.9.3", "react-scripts": "5.0.1",
-    "date-fns": "^3.0.0"
+    "axios": "^1.6.0",
+    "date-fns": "^3.0.0",
+    "gsap": "^3.14.2",
+    "lucide-react": "^1.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.18.0",
+    "react-scripts": "5.0.1",
+    "recharts": "^2.9.3"
   },
-  "scripts": { "start": "react-scripts start", "build": "react-scripts build" },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build"
+  },
   "proxy": "http://localhost:5000",
-  "browserslist": { "production": [">0.2%","not dead"], "development": ["last 1 chrome version"] }
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead"
+    ],
+    "development": [
+      "last 1 chrome version"
+    ]
+  }
 }
