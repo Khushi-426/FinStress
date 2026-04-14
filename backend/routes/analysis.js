@@ -118,10 +118,6 @@ router.post('/run', auth, async (req, res) => {
       books_supplies: booksSupplies,
       entertainment, personal_care: personalCare,
       technology, health_wellness: healthWellness, miscellaneous,
-      total_income: totalIncome, total_expenses: totalExpenses,
-      savings_gap: savingsGap, expense_ratio: expenseRatio,
-      essential_spend: essentialSpend, discretionary_spend: discretionarySpend,
-      discretionary_ratio: discretionaryRatio,
     };
 
     // Call ML service

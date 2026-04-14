@@ -10,8 +10,7 @@ FEATURE_NAMES = [
     'monthly_income', 'financial_aid', 'tuition_monthly',
     'housing', 'food', 'transportation', 'books_supplies',
     'entertainment', 'personal_care', 'technology', 'health_wellness',
-    'miscellaneous', 'total_income', 'total_expenses', 'savings_gap',
-    'expense_ratio', 'essential_spend', 'discretionary_spend', 'discretionary_ratio',
+    'miscellaneous',
 ]
 
 FEATURE_DISPLAY_NAMES = {

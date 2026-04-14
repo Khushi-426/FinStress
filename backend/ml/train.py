@@ -37,10 +37,10 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 
 FT_CONFIG = dict(d_token=192, n_heads=8, n_layers=3, dropout=0.1)
 XGB_CONFIG = dict(
-    n_estimators=500, max_depth=6, learning_rate=0.05,
-    subsample=0.8, colsample_bytree=0.8, min_child_weight=3,
-    reg_alpha=0.1, reg_lambda=1.0, objective='reg:squarederror',
-    eval_metric='mae', early_stopping_rounds=30, random_state=42,
+    n_estimators=1000, max_depth=3, learning_rate=0.01,
+    subsample=0.7, colsample_bytree=0.7, min_child_weight=5,
+    reg_alpha=1.0, reg_lambda=5.0, objective='reg:squarederror',
+    eval_metric='mae', early_stopping_rounds=50, random_state=42,
 )
 DEVICE      = 'cuda' if torch.cuda.is_available() else 'cpu'
 BATCH_SIZE  = 64
