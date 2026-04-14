@@ -20,7 +20,7 @@ import MonthNav from "../components/MonthNav";
 import {
   AlertTriangle, CheckCircle, XCircle,
   FlaskConical, Search, PieChart as PieIcon, BarChart2,
-  TrendingUp, Lightbulb, MessageSquare, RefreshCw,
+  TrendingUp, Lightbulb, RefreshCw,
 } from "lucide-react";
 import {
   CATEGORIES,
@@ -115,77 +115,6 @@ function ShapBar({ item, max }) {
   );
 }
 
-// ── FinBot chat ───────────────────────────────────────────────────────────────
-function FinBot({ month }) {
-  const [msgs, setMsgs] = useState([
-    {
-      role: "assistant",
-      content: `Hi! I'm FinBot. Ask me anything about your ${monthLabel(month)} finances, stress score, or how to save money.`,
-    },
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const endRef = useRef(null);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [msgs]);
-
-  const send = async () => {
-    if (!input.trim() || loading) return;
-    const msg = input.trim();
-    setInput("");
-    setMsgs((m) => [...m, { role: "user", content: msg }]);
-    setLoading(true);
-    try {
-      const { data } = await api.post("/chat", {
-        message: msg,
-        month,
-        history: msgs.slice(-8),
-      });
-      setMsgs((m) => [...m, { role: "assistant", content: data.reply }]);
-    } catch {
-      setMsgs((m) => [
-        ...m,
-        { role: "assistant", content: "Chat unavailable right now. Please try again." },
-      ]);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div className="chat-win">
-      <div className="chat-msgs">
-        {msgs.map((m, i) => (
-          <div key={i} className={`cmsg ${m.role}`}>
-            {m.content}
-          </div>
-        ))}
-        {loading && (
-          <div className="cmsg assistant" style={{ opacity: 0.6 }}>
-            FinBot is thinking…
-          </div>
-        )}
-        <div ref={endRef} />
-      </div>
-      <div className="chat-row">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="Ask about your score, SHAP factors, savings tips…"
-        />
-        <button
-          className="btn btn-primary btn-sm"
-          onClick={send}
-          disabled={loading || !input.trim()}
-        >
-          Send
-        </button>
-      </div>
-    </div>
-  );
-}
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function AnalysisPage() {
@@ -478,7 +407,6 @@ export default function AnalysisPage() {
                 ["budget",      <><BarChart2   size={13} strokeWidth={1.8}/> vs Budget</>],
                 ["trends",      <><TrendingUp  size={13} strokeWidth={1.8}/> Trends</>],
                 ["suggestions", <><Lightbulb  size={13} strokeWidth={1.8}/> Tips ({sugs.length})</>],
-                ["chat",        <><MessageSquare size={13} strokeWidth={1.8}/> FinBot</>],
               ].map(([k, l]) => (
                 <button
                   key={k}
@@ -1092,18 +1020,6 @@ export default function AnalysisPage() {
                 </div>
               ))}
 
-            {/* ── FINBOT TAB ── */}
-            {tab === "chat" && (
-              <>
-                <FinBot month={month} />
-                <div
-                  style={{ fontSize: 11, color: "var(--text3)", marginTop: 8 }}
-                >
-                  FinBot is contextually aware of your {monthLabel(month)}{" "}
-                  financial data and stress score.
-                </div>
-              </>
-            )}
           </div>
         </>
       )}

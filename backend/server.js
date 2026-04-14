@@ -11,13 +11,14 @@ app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000', credentials: true }));
 app.use(morgan('dev'));
 app.use(express.json());
+app.set('trust proxy', 1);
 app.use('/api/', rateLimit({ windowMs: 15*60*1000, max: 200 }));
 
 app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/budget',   require('./routes/budget'));
 app.use('/api/analysis', require('./routes/analysis'));
-app.use('/api/chat',     require('./routes/chat'));
+
 app.get('/api/health', (_, res) => res.json({ status: 'ok' }));
 
 app.use((err, req, res, next) => res.status(500).json({ error: err.message }));

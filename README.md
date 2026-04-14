@@ -5,7 +5,6 @@
 ![Stack](https://img.shields.io/badge/Stack-MERN-C9622F?style=flat-square)
 ![ML](https://img.shields.io/badge/ML-FT--Transformer%20%2B%20XGBoost-3A7D44?style=flat-square)
 ![Explainability](https://img.shields.io/badge/Explainability-SHAP-C4841A?style=flat-square)
-![AI](https://img.shields.io/badge/AI-Claude%20(Anthropic)-2E4057?style=flat-square)
 ![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=flat-square)
 ![Node](https://img.shields.io/badge/Node.js-20%2B-green?style=flat-square)
 
@@ -40,7 +39,6 @@ FinStress v2 is a full-stack web application for college students to track daily
 | Backend API | Node.js 20, Express 4, Mongoose, JWT |
 | Database | MongoDB 7 |
 | ML Service | Python 3.11, FastAPI, PyTorch, XGBoost, SHAP |
-| AI Chat | Anthropic Claude (claude-sonnet-4) |
 
 ---
 
@@ -57,7 +55,6 @@ Log expenses daily   →   Set monthly budget   →   Click "Run Analysis"   →
 4. Hit **Run Analysis** on any month — the backend aggregates your real expense data
 5. The FT-Transformer + XGBoost ensemble scores your financial stress (0–100)
 6. SHAP explains exactly which spending categories drove the score
-7. FinBot (Claude AI) answers questions about your results with full financial context
 
 ---
 
@@ -66,20 +63,16 @@ Log expenses daily   →   Set monthly budget   →   Click "Run Analysis"   →
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              React Frontend  (port 3000)                 │
-│  Dashboard · Tracker · Budget · Analysis · FinBot Chat  │
+│  Dashboard · Tracker · Budget · Analysis  │
 └──────────────────────┬──────────────────────────────────┘
                        │ REST API  (JWT auth)
 ┌──────────────────────▼──────────────────────────────────┐
 │             Express API  (port 5000)                     │
-│   /expenses  /budget  /analysis/run  /chat  /auth       │
+│   /expenses  /budget  /analysis/run  /auth       │
 │              ↕ Mongoose ODM                              │
 │         MongoDB  (expenses, budgets, analyses, users)   │
 └──────────┬───────────────────────────────┬──────────────┘
-           │ HTTP axios                    │ Anthropic API
-           ▼                              ▼
-┌─────────────────────┐      ┌────────────────────────────┐
-│ FastAPI ML Service  │      │  Claude  (FinBot context)  │
-│     (port 8000)     │      └────────────────────────────┘
+│  (port 8000)     │
 │                     │
 │  StandardScaler     │
 │       ↓             │
@@ -104,7 +97,7 @@ Log expenses daily   →   Set monthly budget   →   Click "Run Analysis"   →
 6. Computes SHAP values with `TreeExplainer` on the XGBoost output
 7. Returns ensemble score, class probabilities and SHAP waterfall
 8. Express generates personalised suggestions, saves `Analysis` document to MongoDB
-9. Frontend renders stress rings, SHAP bars, spending charts, suggestions and FinBot chat
+9. Frontend renders stress rings, SHAP bars, spending charts and suggestions
 
 ---
 
@@ -200,9 +193,8 @@ finstress2/
 │   │   ├── expenses.js             # CRUD + /summary + /daily aggregation
 │   │   ├── budget.js               # GET and PUT monthly budget upsert
 │   │   ├── analysis.js             # POST /run — aggregate → ML → save
-│   │   └── chat.js                 # FinBot AI chat with financial context
-│   │
-│   └── ml/
+│   │   │
+│   │   └── ml/
 │       ├── features.py             # feature derivation, encoding maps, stress labels
 │       ├── ft_transformer.py       # FT-Transformer — NumericalEmbedding, TransformerBlock
 │       ├── train.py                # training script — loads CSV, trains, saves artefacts
@@ -238,7 +230,7 @@ finstress2/
         │   ├── DashboardPage.jsx   # budget vs actual bars, daily chart, trend line
         │   ├── TrackerPage.jsx     # daily expense list — grouped by day, recurring strip
         │   ├── BudgetPage.jsx      # income + per-category targets with live progress bars
-        │   └── AnalysisPage.jsx    # 7-tab results: score, SHAP, spending, budget, trends, tips, chat
+        │   └── AnalysisPage.jsx    # 6-tab results: score, SHAP, spending, budget, trends, tips
         │
         └── utils/
             ├── api.js              # Axios instance with error interceptor
@@ -268,7 +260,6 @@ finstress2/
 | `POST` | `/api/analysis/run` | Yes | Aggregate expenses → run ML → save result |
 | `GET` | `/api/analysis/:month` | Yes | Get saved analysis for a month |
 | `GET` | `/api/analysis` | Yes | List all analyses (for trend chart) |
-| `POST` | `/api/chat` | Yes | FinBot AI chat with financial context |
 | `GET` | `/api/health` | No | Health check |
 
 ### FastAPI ML Service — port 8000
@@ -406,9 +397,6 @@ MONGO_URI=mongodb://localhost:27017/finstress
 JWT_SECRET=your_super_secret_key_change_in_production
 JWT_EXPIRES_IN=7d
 
-# Anthropic — only needed for FinBot chat tab
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-
 # Python ML service
 ML_SERVICE_URL=http://localhost:8000
 ```
@@ -417,12 +405,9 @@ ML_SERVICE_URL=http://localhost:8000
 |---|---|---|
 | `JWT_SECRET` | ✅ Yes | Any long random string — app won't start without it |
 | `MONGO_URI` | ✅ Yes | Default points to local MongoDB |
-| `ANTHROPIC_API_KEY` | ⚠️ Optional | Only needed for the FinBot chat tab |
 | `ML_SERVICE_URL` | ⚠️ Optional | Defaults to `http://localhost:8000` |
 | `PORT` | ⚠️ Optional | Defaults to `5000` |
 
-> **Without `ANTHROPIC_API_KEY`:** everything works except the FinBot chat tab.
->
 > **Without the ML service running:** the backend falls back to a rule-based stress score automatically — no crash.
 
 ---
@@ -451,7 +436,7 @@ ML_SERVICE_URL=http://localhost:8000
 - Daily spend bar chart highlighting high-spend days
 - Stress score trend line across the last 12 months
 
-### 🔬 Analysis (7 tabs)
+### 🔬 Analysis (6 tabs)
 
 | Tab | What it shows |
 |---|---|
@@ -461,7 +446,6 @@ ML_SERVICE_URL=http://localhost:8000
 | **vs Budget** | Horizontal grouped bar chart — your spending vs targets |
 | **Trends** | Line chart + monthly history table with score and net gap per month |
 | **Suggestions** | Up to 7 rule-based personalised tips with potential monthly savings |
-| **FinBot** | Claude AI chat — contextually aware of the selected month's financial data and SHAP factors |
 
 ### Fallback mode
 
@@ -471,7 +455,7 @@ If the Python ML service (port 8000) is unreachable, the Express backend automat
 score = clamp((expense_ratio − 0.3) / 1.7 × 100, 0, 100)
 ```
 
-SHAP values will be empty but all other features (tracker, budget, suggestions, chat) work normally.
+SHAP values will be empty but all other features (tracker, budget, suggestions) work normally.
 
 ---
 

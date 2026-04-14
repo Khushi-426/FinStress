@@ -56,16 +56,47 @@ const S = {
   },
   headingAccent: { color: "var(--accent)", fontStyle: "italic" },
   sub: { color: "var(--text2)", fontSize: "clamp(13px, 1vw, 14px)", marginBottom: 0 },
-  sideMetric: { display: "flex", flexDirection: "column", gap: "0.65rem" },
+  sideMetric: { display: "flex", flexDirection: "column", gap: "0.65rem", position: "relative", overflow: "hidden" },
   sideLabel: {
-    fontSize: 11, fontWeight: 500, color: "var(--text3)",
-    textTransform: "uppercase", letterSpacing: "0.4px",
+    fontSize: 10, fontWeight: 600, color: "var(--text3)",
+    textTransform: "uppercase", letterSpacing: "0.8px",
   },
   sideValue: {
-    fontSize: "clamp(1.3rem, 2.2vw, 1.7rem)",
-    fontWeight: 600, lineHeight: 1, fontFamily: "var(--sans)",
+    fontSize: "clamp(1.4rem, 2.4vw, 1.9rem)",
+    fontWeight: 700, lineHeight: 1, fontFamily: "var(--sans)",
+    letterSpacing: "-0.01em",
   },
+  glow: {
+    position: "absolute", top: "-20%", right: "-10%",
+    width: "60px", height: "60px", borderRadius: "50%",
+    filter: "blur(25px)", opacity: 0.15, zIndex: 0
+  }
 };
+
+function MetricCard({ label, value, sub, icon: Icon, color, trend }) {
+  const cardRef = useRef(null);
+  
+  useEffect(() => {
+    gsap.fromTo(cardRef.current, { opacity: 0, scale: 0.95 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.7)" });
+  }, []);
+
+  return (
+    <div className="card card--shimmer" ref={cardRef} style={{ marginBottom: 0, position: "relative", overflow: "hidden" }}>
+      <div style={{ ...S.glow, background: color || "var(--accent)" }} />
+      <div style={S.sideMetric}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", zIndex: 1 }}>
+          <div style={S.sideLabel}>{label}</div>
+          {Icon && <Icon size={14} color={color || "var(--text3)"} strokeWidth={2.5} />}
+        </div>
+        <div style={{ ...S.sideValue, color: color || "var(--text)", position: "relative", zIndex: 1 }}>{value}</div>
+        <div style={{ fontSize: 11, color: "var(--text3)", display: "flex", alignItems: "center", gap: 4, position: "relative", zIndex: 1 }}>
+          {trend && <span style={{ color: trend > 0 ? "var(--red)" : "var(--green)" }}>{trend > 0 ? "↑" : "↓"}</span>}
+          {sub}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ─── small reusable card-icon wrapper ─────────────────────── */
 function CardIcon({ children }) {
@@ -313,20 +344,14 @@ export default function DashboardPage() {
 
             {/* ── RIGHT: metric cards + actions ────────────── */}
             <div style={S.sideStack}>
+              <MetricCard 
+                label="Income & Aid" 
+                value={fmt(totalIncome)} 
+                sub="Total received" 
+                icon={ArrowUpRight} 
+                color="var(--green)" 
+              />
 
-              {/* Income */}
-              <div className="card" style={{ marginBottom: 0 }}>
-                <div style={S.sideMetric}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={S.sideLabel}>Income & Aid</div>
-                    <ArrowUpRight size={14} color="var(--green)" strokeWidth={2} />
-                  </div>
-                  <div style={{ ...S.sideValue, color: "var(--green)" }}>{fmt(totalIncome)}</div>
-                  <div style={{ fontSize: 11, color: "var(--text3)" }}>Total received</div>
-                </div>
-              </div>
-
-              {/* Spent */}
               <div className="card" style={{ marginBottom: 0 }}>
                 <div style={S.sideMetric}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -336,47 +361,32 @@ export default function DashboardPage() {
                   <div style={{ ...S.sideValue, color: spendPct > 90 ? "var(--red)" : "var(--text)" }}>
                     {fmt(totalExpenses)}
                   </div>
-                  <div style={{ height: 5, borderRadius: 3, background: "var(--surface2)", overflow: "hidden", marginTop: 2 }}>
+                  <div style={{ height: 6, borderRadius: 3, background: "var(--surface2)", overflow: "hidden", marginTop: 4 }}>
                     <div style={{
                       height: "100%", borderRadius: 3,
                       width: `${Math.min(spendPct, 100)}%`,
                       background: spendPct > 90 ? "var(--red)" : spendPct > 70 ? "var(--amber)" : "var(--accent)",
-                      transition: "width .6s cubic-bezier(.4,0,.2,1)",
+                      transition: "width .8s cubic-bezier(.4,0,.2,1)",
                     }} />
                   </div>
-                  <div style={{ fontSize: 11, color: "var(--text3)" }}>{spendPct}% of income</div>
+                  <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 4 }}>{spendPct}% of income</div>
                 </div>
               </div>
 
-              {/* Surplus */}
-              <div className="card" style={{
-                marginBottom: 0,
-                background: savingsGap < 0 ? "rgba(192,57,43,0.06)" : "rgba(58,125,68,0.06)",
-              }}>
-                <div style={S.sideMetric}>
-                  <div style={S.sideLabel}>Surplus</div>
-                  <div style={{ ...S.sideValue, color: savingsGap < 0 ? "var(--red)" : "var(--green)" }}>
-                    {(savingsGap >= 0 ? "+" : "−") + fmt(Math.abs(savingsGap))}
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: savingsGap < 0 ? "var(--red)" : "var(--green)" }}>
-                    {savingsGap < 0
-                      ? <><ArrowDownRight size={11} strokeWidth={2.2} /> Overspending</>
-                      : <><ArrowUpRight size={11} strokeWidth={2.2} /> Positive buffer</>
-                    }
-                  </div>
-                </div>
-              </div>
+              <MetricCard 
+                label="Surplus" 
+                value={(savingsGap >= 0 ? "+" : "−") + fmt(Math.abs(savingsGap))} 
+                sub={savingsGap < 0 ? "Overspending" : "Positive buffer"} 
+                icon={savingsGap < 0 ? ArrowDownRight : ArrowUpRight} 
+                color={savingsGap < 0 ? "var(--red)" : "var(--green)"} 
+              />
 
-              {/* Categories tracked */}
-              <div className="card" style={{ marginBottom: 0 }}>
-                <div style={S.sideMetric}>
-                  <div style={S.sideLabel}>Categories tracked</div>
-                  <div style={S.sideValue}>
-                    {summary?.byCategory ? Object.values(summary.byCategory).length : 0}
-                  </div>
-                  <div style={{ fontSize: 11, color: "var(--text3)" }}>expense entries</div>
-                </div>
-              </div>
+              <MetricCard 
+                label="Categories tracked" 
+                value={summary?.byCategory ? Object.values(summary.byCategory).length : 0} 
+                sub="expense entries" 
+                icon={Wallet} 
+              />
 
               {/* Quick actions */}
               <div className="card" style={{ marginBottom: 0 }}>
