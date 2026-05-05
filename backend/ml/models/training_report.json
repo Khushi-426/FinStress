@@ -1,0 +1,39 @@
+{
+  "ft_transformer": {
+    "mae": 1.2992485761642456,
+    "r2": 0.9932799961386017
+  },
+  "xgboost": {
+    "mae": 3.956782817840576,
+    "r2": 0.9494341222152163
+  },
+  "ensemble": {
+    "mae": 2.3480722904205322,
+    "r2": 0.9778709197343369
+  },
+  "feature_names": [
+    "age",
+    "gender_enc",
+    "year_enc",
+    "major_enc",
+    "payment_enc",
+    "monthly_income",
+    "financial_aid",
+    "tuition_monthly",
+    "housing",
+    "food",
+    "transportation",
+    "books_supplies",
+    "entertainment",
+    "personal_care",
+    "technology",
+    "health_wellness",
+    "miscellaneous"
+  ],
+  "n_train": 680,
+  "n_test": 200,
+  "ensemble_weights": {
+    "ft": 0.45,
+    "xgb": 0.55
+  }
+}
