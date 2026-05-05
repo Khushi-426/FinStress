@@ -2,9 +2,12 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
 import MonthNav from '../components/MonthNav';
-import { EXPENSE_CATS, fmt, currentMonth } from '../utils/categories';
+import { getMergedExpenseCats, fmt, currentMonth } from '../utils/categories';
+import { useAuth } from '../context/AuthContext';
+import { Plus, Tag } from 'lucide-react';
 
 export default function BudgetPage() {
+  const { user, refresh } = useAuth();
   const loc = useLocation();
   const [month,   setMonth]   = useState(loc.state?.month || currentMonth());
   const [targets, setTargets] = useState({});
@@ -13,6 +16,8 @@ export default function BudgetPage() {
   const [summary, setSummary] = useState(null);
   const [saved,   setSaved]   = useState(false);
   const [loading, setLoading] = useState(true);
+  const [newCat,  setNewCat]  = useState({ label: '', icon: '📦' });
+  const [showAdd, setShowAdd] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,11 +38,30 @@ export default function BudgetPage() {
 
   const set = k => e => setTargets(t => ({ ...t, [k]: +e.target.value || 0 }));
 
+  const addCategory = async () => {
+    if (!newCat.label) return;
+    const cat = {
+      id: newCat.label.toLowerCase().replace(/\s+/g, '_'),
+      label: newCat.label,
+      icon: newCat.icon,
+      type: 'expense',
+      color: '#90a4ae'
+    };
+    try {
+      await api.post('/auth/categories', { category: cat });
+      await refresh();
+      setNewCat({ label: '', icon: '📦' });
+      setShowAdd(false);
+    } catch (e) { alert(e.message); }
+  };
+
   const save = async () => {
     await api.put('/budget', { month, targets, monthlyIncome: +income||0, financialAid: +aid||0 });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
+
+  const expenseCats = getMergedExpenseCats(user?.customCategories || []);
 
   const totalBudget   = Object.values(targets).reduce((s,v)=>s+(+v||0),0);
   const totalActual   = summary?.totalExpenses || 0;
@@ -102,14 +126,33 @@ export default function BudgetPage() {
 
           <section style={{ marginBottom: '6rem' }}>
             <h2 className="section-title" style={{ textAlign: 'left', marginBottom: '3rem' }}>Spending Targets</h2>
-            <div className="story-narrative" style={{ marginBottom: '4rem' }}>
-              <p>
-                Assign your limits for each category. We'll compare your actual spending against these targets in real-time.
-              </p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4rem' }}>
+              <div className="story-narrative" style={{ margin: 0 }}>
+                <p>
+                  Assign your limits for each category. We'll compare your actual spending against these targets in real-time.
+                </p>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setShowAdd(!showAdd)}>
+                <Plus size={16} /> Add Custom Category
+              </button>
             </div>
+
+            {showAdd && (
+              <div className="highlight-panel" style={{ marginBottom: '4rem', display: 'flex', gap: '2rem', alignItems: 'flex-end', background: 'var(--surface2)' }}>
+                <div className="fg" style={{ flex: 1 }}>
+                  <label>Category Name</label>
+                  <input type="text" value={newCat.label} onChange={e => setNewCat(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Subscriptions" />
+                </div>
+                <div className="fg" style={{ width: '80px' }}>
+                  <label>Emoji</label>
+                  <input type="text" value={newCat.icon} onChange={e => setNewCat(p => ({ ...p, icon: e.target.value }))} style={{ textAlign: 'center' }} />
+                </div>
+                <button className="btn btn-primary" onClick={addCategory} style={{ padding: '12px 24px' }}>Add</button>
+              </div>
+            )}
             
             <div style={{display:'flex',flexDirection:'column',gap:'3.5rem'}}>
-              {EXPENSE_CATS.map(cat => {
+              {expenseCats.map(cat => {
                 const target = targets[cat.id] || 0;
                 const actual = Math.round(summary?.byCategory?.[cat.id] || 0);
                 const over   = target > 0 && actual > target;

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, googleLogin } = useAuth();
   const navigate = useNavigate();
-  const [f, setF] = useState({ name:'',email:'',password:'',age:'',gender:'Male',yearInSchool:'Freshman',major:'Computer Science',paymentMethod:'Credit/Debit Card' });
+  const [f, setF] = useState({ name:'',email:'',password:'',age:'',gender:'Male',major:'Computer Science',paymentMethod:'Credit/Debit Card' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   const set = k => e => setF(p=>({...p,[k]:e.target.value}));
@@ -28,7 +29,7 @@ export default function RegisterPage() {
           <div className="grid2">
             <div className="fg">
               <label>Full Name</label>
-              <input value={f.name} onChange={set('name')} placeholder="Alex Johnson" required/>
+              <input type="text" value={f.name} onChange={set('name')} placeholder="Alex Johnson" required/>
             </div>
             <div className="fg">
               <label>Email Address</label>
@@ -40,7 +41,7 @@ export default function RegisterPage() {
             </div>
             <div className="fg">
               <label>Age</label>
-              <input type="number" value={f.age} onChange={set('age')} placeholder="18\u201325" min={13} max={35}/>
+              <input type="number" value={f.age} onChange={set('age')} placeholder="18-25" min={13} max={35}/>
             </div>
             <div className="fg">
               <label>Gender</label>
@@ -48,12 +49,6 @@ export default function RegisterPage() {
                 <option>Male</option>
                 <option>Female</option>
                 <option>Non-binary</option>
-              </select>
-            </div>
-            <div className="fg">
-              <label>Year in School</label>
-              <select value={f.yearInSchool} onChange={set('yearInSchool')}>
-                {['Freshman','Sophomore','Junior','Senior'].map(y=><option key={y}>{y}</option>)}
               </select>
             </div>
             <div className="fg">
@@ -78,6 +73,30 @@ export default function RegisterPage() {
             {busy ? 'Creating…' : 'Create account \u2192'}
           </button>
         </form>
+
+        <div style={{ margin: '2rem 0', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+          <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 700 }}>OR</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <GoogleLogin
+            onSuccess={credentialResponse => {
+              const { credential } = credentialResponse;
+              setBusy(true);
+              googleLogin(credential)
+                .then(() => navigate('/'))
+                .catch(e => setErr(e.response?.data?.error || 'Google Registration failed'))
+                .finally(() => setBusy(false));
+            }}
+            onError={() => setErr('Google Registration Failed')}
+            useOneTap
+            theme="filled_blue"
+            shape="pill"
+            text="signup_with"
+          />
+        </div>
 
         <p style={{ textAlign:'center', fontSize: 14, marginTop:'2.5rem', color:'var(--color-text-secondary)' }}>
           Already registered? <Link to="/login" style={{ color:'var(--color-primary)', fontWeight:600 }}>Sign in</Link>

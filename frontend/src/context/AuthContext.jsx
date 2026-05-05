@@ -22,11 +22,12 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login    = async (e, p) => { const { data } = await api.post('/auth/login',    { email:e, password:p }); _save(data.token, data.user); };
+  const googleLogin = async (idToken) => { const { data } = await api.post('/auth/google', { idToken }); _save(data.token, data.user); };
   const register = async (f)    => { const { data } = await api.post('/auth/register', f); _save(data.token, data.user); };
   const logout   = ()           => { localStorage.removeItem('fs_token'); delete api.defaults.headers.common['Authorization']; setUser(null); };
   const refresh  = async ()     => { const { data } = await api.get('/auth/me'); setUser(data.user); };
 
-  return <Ctx.Provider value={{ user, loading, login, register, logout, refresh }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ user, loading, login, googleLogin, register, logout, refresh }}>{children}</Ctx.Provider>;
 };
 
 export const useAuth = () => useContext(Ctx);

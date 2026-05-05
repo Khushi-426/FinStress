@@ -4,7 +4,8 @@ import { Pencil, Trash2, Repeat, Inbox, Plus, List, DollarSign } from 'lucide-re
 import api from '../utils/api';
 import MonthNav    from '../components/MonthNav';
 import ExpenseModal from '../components/ExpenseModal';
-import { CATEGORIES, CAT_MAP, fmt, currentMonth } from '../utils/categories';
+import { getMergedExpenseCats, getMergedCategories, fmt, currentMonth } from '../utils/categories';
+import { useAuth } from '../context/AuthContext';
 
 const groupByDate = (items) => {
   const groups = {};
@@ -26,10 +27,12 @@ const fmtDay = (d) => {
 };
 
 export default function TrackerPage() {
+  const { user } = useAuth();
   const loc = useLocation();
   const [month,    setMonth]    = useState(loc.state?.month || currentMonth());
   const [items,    setItems]    = useState([]);
   const [summary,  setSummary]  = useState(null);
+  const [budget,   setBudget]   = useState(null);
   const [loading,  setLoading]  = useState(true);
   const [showModal,setShowModal]= useState(false);
   const [editing,  setEditing]  = useState(null);
@@ -38,12 +41,14 @@ export default function TrackerPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [eR, sR] = await Promise.all([
+      const [eR, sR, bR] = await Promise.all([
         api.get(`/expenses?month=${month}&limit=500`),
         api.get(`/expenses/summary?month=${month}`),
+        api.get(`/budget?month=${month}`),
       ]);
       setItems(eR.data);
       setSummary(sR.data);
+      setBudget(bR.data._id ? bR.data : null);
     } catch {}
     setLoading(false);
   }, [month]);
@@ -84,6 +89,9 @@ export default function TrackerPage() {
   const totalOut = summary?.totalExpenses || 0;
   const gap      = summary?.savingsGap ?? totalIn - totalOut;
 
+  const expenseCats = getMergedExpenseCats(user?.customCategories || []);
+  const isBudgetComplete = budget && expenseCats.every(c => budget.targets && budget.targets[c.id] !== undefined);
+
   const mainInsight = gap < 0 
     ? `You are running a deficit of ${fmt(Math.abs(gap))}` 
     : `You have saved ${fmt(gap)} this month`;
@@ -97,7 +105,18 @@ export default function TrackerPage() {
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
           <MonthNav month={month} onChange={setMonth}/>
-          <button className="btn btn-gradient" style={{ padding: '12px 24px' }} onClick={()=>{setEditing(null);setShowModal(true);}}>
+          <button 
+            className={`btn ${budget ? 'btn-gradient' : 'btn-ghost'}`} 
+            style={{ padding: '12px 24px' }} 
+            onClick={()=>{
+              if (!isBudgetComplete) {
+                alert("Please complete all categories in your budget for this month first!");
+                return;
+              }
+              setEditing(null);
+              setShowModal(true);
+            }}
+          >
             <Plus size={18} /> New Entry
           </button>
         </div>
@@ -136,7 +155,22 @@ export default function TrackerPage() {
         </div>
 
         {loading ? <div className="spin-full"><div className="spin"/></div> : (
-          groups.length === 0 ? (
+          !isBudgetComplete ? (
+            <div style={{textAlign:'center',padding:'8rem 0', background: 'var(--surface2)', borderRadius: '32px', border: '2px dashed var(--color-border)'}}>
+              <DollarSign size={64} strokeWidth={1} style={{margin:'0 auto 2rem',color:'var(--color-primary)', opacity: 0.8}}/>
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: '2.5rem', marginBottom: '1rem' }}>Plan Your Path First.</h2>
+              <p style={{color:'var(--color-text-secondary)',fontSize:18,marginBottom:'3rem', maxWidth: '450px', margin: '0 auto 3rem'}}>
+                To give you the most accurate stress insights, you must fill all categories in your budget goals for {month}.
+              </p>
+              <button 
+                className="btn btn-gradient" 
+                style={{ padding: '16px 48px', fontSize: '18px' }} 
+                onClick={() => window.location.href = '/budget'}
+              >
+                Complete Monthly Budget
+              </button>
+            </div>
+          ) : groups.length === 0 ? (
             <div style={{textAlign:'center',padding:'8rem 0'}}>
               <Inbox size={64} strokeWidth={1} style={{margin:'0 auto 2rem',color:'var(--color-text-secondary)', opacity: 0.5}}/>
               <p style={{color:'var(--color-text-secondary)',fontSize:18,marginBottom:'2rem'}}>
@@ -162,7 +196,7 @@ export default function TrackerPage() {
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                       {exps.map(e => {
-                        const cat = CAT_MAP[e.category] || { icon: null, label: e.category, color:'#888' };
+                        const cat = getMergedCategories(user?.customCategories).find(c => c.id === e.category) || { icon: null, label: e.category, color:'#888' };
                         const isInc = e.type==='income'||e.category==='financial_aid';
                         return (
                           <div key={e._id} style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>

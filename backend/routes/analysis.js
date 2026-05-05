@@ -78,11 +78,14 @@ router.post('/run', auth, async (req, res) => {
       if (_id.category === 'income' || _id.category === 'financial_aid') totalIncome += total;
     });
 
-    // Pull budget for income if not tracked as expenses
+    // Pull budget for targets and fallback income
     const budget = await Budget.findOne({ userId: user._id, month });
-    if (budget) {
-      if (!totalIncome) totalIncome = (budget.monthlyIncome||0) + (budget.financialAid||0);
-    }
+    const targets = budget?.targets || {};
+
+    // Combine Budget income (base) with Tracked income (extra/random)
+    const budgetIncome = (budget?.monthlyIncome || 0) + (budget?.financialAid || 0);
+    const trackedIncome = totalIncome; 
+    const finalIncome = budgetIncome + trackedIncome;
 
     const tuitionMonthly    = (byCategory.tuition||0);
     const housing           = byCategory.housing||0;
@@ -96,13 +99,38 @@ router.post('/run', auth, async (req, res) => {
     const miscellaneous     = byCategory.miscellaneous||0;
 
     const totalExpenses      = tuitionMonthly+housing+food+transportation+booksSupplies+entertainment+personalCare+technology+healthWellness+miscellaneous;
-    const savingsGap         = totalIncome - totalExpenses;
-    const expenseRatio       = totalIncome > 0 ? totalExpenses/totalIncome : 3;
+    const savingsGap         = finalIncome - totalExpenses;
+    const expenseRatio       = finalIncome > 0 ? totalExpenses/finalIncome : 3;
     const essentialSpend     = tuitionMonthly+housing+food+transportation+booksSupplies+healthWellness;
     const discretionarySpend = entertainment+personalCare+technology+miscellaneous;
-    const discretionaryRatio = totalIncome > 0 ? discretionarySpend/totalIncome : 1;
+    const discretionaryRatio = finalIncome > 0 ? discretionarySpend/finalIncome : 1;
 
-    const snapshot = { totalIncome, totalExpenses, savingsGap, expenseRatio, essentialSpend, discretionarySpend, discretionaryRatio, byCategory };
+    // Calculate Budget Variance (Over-spending penalty)
+    let overBudgetAmount = 0;
+    Object.keys(targets).forEach(cat => {
+      const actual = byCategory[cat] || 0;
+      const target = targets[cat] || 0;
+      if (target > 0 && actual > target) {
+        overBudgetAmount += (actual - target);
+      }
+    });
+
+    // Stress multiplier: If over budget, we artificially increase the perceived expense ratio for the ML
+    const budgetPenalty = overBudgetAmount > 0 ? (overBudgetAmount / Math.max(finalIncome, 1)) * 0.5 : 0;
+    const adjustedExpenseRatio = expenseRatio + budgetPenalty;
+
+    const snapshot = { 
+      totalIncome: finalIncome, 
+      totalExpenses, 
+      savingsGap, 
+      expenseRatio, 
+      essentialSpend, 
+      discretionarySpend, 
+      discretionaryRatio, 
+      byCategory,
+      overBudgetAmount,
+      targets
+    };
 
     // Build ML feature vector
     const features = {
@@ -111,8 +139,8 @@ router.post('/run', auth, async (req, res) => {
       year_enc:     { Freshman:1, Sophomore:2, Junior:3, Senior:4 }[user.yearInSchool]??1,
       major_enc:    { Biology:0,'Computer Science':1, Economics:2, Engineering:3, Psychology:4, Other:5 }[user.major]??0,
       payment_enc:  { 'Credit/Debit Card':0, Cash:1, 'Mobile Payment App':2 }[user.paymentMethod]??0,
-      monthly_income: totalIncome,
-      financial_aid: byCategory.financial_aid||0,
+      monthly_income: finalIncome,
+      financial_aid: (budget?.financialAid || 0) + (byCategory.financial_aid||0),
       tuition_monthly: tuitionMonthly,
       housing, food, transportation,
       books_supplies: booksSupplies,
@@ -123,11 +151,13 @@ router.post('/run', auth, async (req, res) => {
     // Call ML service
     let mlResult;
     try {
-      const resp = await axios.post(`${ML_URL}/predict`, { features }, { timeout: 10000 });
+      // We pass the adjusted ratio to influence the score if over budget
+      const mlFeatures = { ...features, expense_ratio: adjustedExpenseRatio };
+      const resp = await axios.post(`${ML_URL}/predict`, { features: mlFeatures }, { timeout: 10000 });
       mlResult = resp.data;
     } catch {
       // Sophisticated rule-based fallback if ML service is down
-      const score = Math.max(0, Math.min(100, ((expenseRatio - 0.3) / 1.7) * 100));
+      const score = Math.max(0, Math.min(100, ((adjustedExpenseRatio - 0.3) / 1.7) * 100));
       const level = score < 33 ? 'Low' : score < 66 ? 'Medium' : 'High';
       
       // Identify top spending categories for "simulated" SHAP

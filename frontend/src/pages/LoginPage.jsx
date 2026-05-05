@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { login, googleLogin } = useAuth();
   const navigate  = useNavigate();
   const [f, setF] = useState({ email:'', password:'' });
   const [err, setErr] = useState('');
@@ -40,6 +41,29 @@ export default function LoginPage() {
             {busy ? 'Signing in…' : 'Sign in \u2192'}
           </button>
         </form>
+
+        <div style={{ margin: '2rem 0', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+          <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 700 }}>OR</span>
+          <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <GoogleLogin
+            onSuccess={credentialResponse => {
+              const { credential } = credentialResponse;
+              setBusy(true);
+              googleLogin(credential)
+                .then(() => navigate('/'))
+                .catch(e => setErr(e.response?.data?.error || 'Google Login failed'))
+                .finally(() => setBusy(false));
+            }}
+            onError={() => setErr('Google Login Failed')}
+            useOneTap
+            theme="filled_blue"
+            shape="pill"
+          />
+        </div>
 
         <p style={{ textAlign:'center', fontSize: 14, marginTop:'2.5rem', color:'var(--color-text-secondary)' }}>
           No account? <Link to="/register" style={{ color:'var(--color-primary)', fontWeight:600 }}>Register free</Link>

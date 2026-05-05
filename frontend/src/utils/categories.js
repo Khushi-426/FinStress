@@ -17,6 +17,18 @@ export const CAT_MAP = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 export const EXPENSE_CATS = CATEGORIES.filter(c => c.type === 'expense');
 export const INCOME_CATS  = CATEGORIES.filter(c => c.type === 'income');
 
+export const getMergedCategories = (custom = []) => {
+  const merged = [...CATEGORIES];
+  custom.forEach(c => {
+    if (!merged.find(m => m.id === c.id)) merged.push(c);
+  });
+  return merged;
+};
+
+export const getMergedExpenseCats = (custom = []) => {
+  return getMergedCategories(custom).filter(c => c.type === 'expense');
+};
+
 export const fmt  = (n) => '₹' + Math.abs(Math.round(n)).toLocaleString('en-IN');
 export const fmtSigned = (n) => (n >= 0 ? '+' : '-') + fmt(n);
 export const pct  = (n) => Math.round(n * 10) / 10 + '%';

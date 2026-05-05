@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar } from 'lucide-react';
-import { CATEGORIES, CAT_MAP } from '../utils/categories';
+import { getMergedCategories } from '../utils/categories';
+import { useAuth } from '../context/AuthContext';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ExpenseModal({ initial, onSave, onClose }) {
+  const { user } = useAuth();
+  const cats = getMergedCategories(user?.customCategories || []);
   const [form, setForm] = useState({
     date: today(), category: 'food', amount: '',
     note: '', isRecurring: false, type: 'expense',
@@ -14,9 +17,9 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
-    const cat = CATEGORIES.find(c => c.id === form.category);
+    const cat = cats.find(c => c.id === form.category);
     if (cat) setForm(f => ({ ...f, type: cat.type }));
-  }, [form.category]);
+  }, [form.category, cats]);
 
   const submit = () => {
     if (!form.amount || isNaN(+form.amount) || +form.amount <= 0) return setErr('Enter a valid amount');
@@ -24,7 +27,7 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
     onSave({ ...form, amount: +form.amount });
   };
 
-  const currentCat = CAT_MAP[form.category];
+  const currentCat = cats.find(c => c.id === form.category);
 
   return (
     <div className="modal-back" onClick={e => e.target===e.currentTarget && onClose()}>
@@ -49,7 +52,7 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
           <div className="fg">
             <label>Select Category</label>
             <div className="cat-tile-grid">
-              {CATEGORIES.map(c => (
+              {cats.map(c => (
                 <div 
                   key={c.id} 
                   className={`cat-tile ${form.category === c.id ? 'active' : ''}`}

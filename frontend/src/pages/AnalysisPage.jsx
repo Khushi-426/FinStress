@@ -190,6 +190,9 @@ export default function AnalysisPage() {
               {risks.length > 0 && (
                 <p>
                   Your stress is primarily affected by <span className="text-red">{risks.slice(0, 2).join(" and ")}</span>.
+                  {analysis.snapshot?.overBudgetAmount > 0 && (
+                    <> This includes <strong className="text-red">{fmt(analysis.snapshot.overBudgetAmount)}</strong> spent beyond your planned budget targets.</>
+                  )}
                 </p>
               )}
               {positives.length > 0 && (

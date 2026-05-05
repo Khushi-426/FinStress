@@ -10,11 +10,20 @@ const userSchema = new mongoose.Schema({
   yearInSchool: { type: String, enum: ['Freshman', 'Sophomore', 'Junior', 'Senior'] },
   major:        { type: String, enum: ['Computer Science','Engineering','Biology','Economics','Psychology','Other'] },
   paymentMethod:{ type: String, enum: ['Credit/Debit Card','Cash','Mobile Payment App'], default: 'Credit/Debit Card' },
+  googleId:     { type: String, unique: true, sparse: true },
+  isGoogleUser: { type: Boolean, default: false },
+  customCategories: [{
+    id:    { type: String, required: true },
+    label: { type: String, required: true },
+    icon:  { type: String, default: '📦' },
+    color: { type: String, default: '#90a4ae' },
+    type:  { type: String, default: 'expense' }
+  }],
   createdAt:    { type: Date, default: Date.now },
 });
 
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || this.isGoogleUser) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });

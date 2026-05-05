@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import Layout       from './components/Layout';
 import LoginPage    from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -18,19 +19,21 @@ const Protected = ({ children }) => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login"    element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/" element={<Protected><Layout /></Protected>}>
-            <Route index          element={<DashboardPage />} />
-            <Route path="tracker" element={<TrackerPage />} />
-            <Route path="budget"  element={<BudgetPage />} />
-            <Route path="analyse" element={<AnalysisPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <GoogleOAuthProvider clientId={process.env.REACT_APP_GOOGLE_CLIENT_ID || "PASTE_YOUR_GOOGLE_CLIENT_ID_HERE"}>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login"    element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/" element={<Protected><Layout /></Protected>}>
+              <Route index          element={<DashboardPage />} />
+              <Route path="tracker" element={<TrackerPage />} />
+              <Route path="budget"  element={<BudgetPage />} />
+              <Route path="analyse" element={<AnalysisPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 }
