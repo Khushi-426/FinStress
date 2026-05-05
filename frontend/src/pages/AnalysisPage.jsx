@@ -187,8 +187,28 @@ export default function AnalysisPage() {
               <p>
                 This month, you spent <strong className="text-blue">{fmt(analysis.snapshot?.totalExpenses || 0)}</strong> against an income of <strong className="text-green">{fmt(analysis.snapshot?.totalIncome || 0)}</strong>.
               </p>
+              
+              {summary?.comparison && (
+                <div style={{ marginTop: '2rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <p style={{ fontSize: '1rem', color: 'var(--color-text-secondary)', marginBottom: '0.5rem' }}>Significant changes from last month:</p>
+                  {Object.entries(summary.comparison)
+                    .filter(([_, change]) => Math.abs(change) > 5)
+                    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+                    .slice(0, 3)
+                    .map(([cat, change]) => (
+                      <div key={cat} style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--surface2)', padding: '12px 20px', borderRadius: '16px' }}>
+                        {change > 0 ? <TrendingUp size={16} color="var(--red)" /> : <TrendingDown size={16} color="var(--green)" />}
+                        <span style={{ fontSize: '14px', flex: 1, textTransform: 'capitalize' }}>{cat.replace('_', ' ')}</span>
+                        <span style={{ fontSize: '14px', fontWeight: 700, color: change > 0 ? 'var(--red)' : 'var(--green)' }}>
+                          {change > 0 ? '↑' : '↓'} {Math.abs(change)}%
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+
               {risks.length > 0 && (
-                <p>
+                <p style={{ marginTop: '2rem' }}>
                   Our analysis indicates that your current pressure is largely driven by <span className="text-red">{risks.slice(0, 2).join(" and ")}</span>. 
                   {analysis.snapshot?.overBudgetAmount > 0 && (
                     <> Specifically, you've exceeded your planned spending limits by <strong className="text-red">{fmt(analysis.snapshot.overBudgetAmount)}</strong>, which is a primary driver of financial instability.</>

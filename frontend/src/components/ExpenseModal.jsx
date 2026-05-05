@@ -15,26 +15,54 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
     ...initial,
   });
   const [err, setErr] = useState('');
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const [isDirty, setIsDirty] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleClose = () => {
+    if (isDirty && form.amount) {
+      if (window.confirm('You have unsaved changes. Are you sure you want to discard them?')) {
+        onClose();
+      }
+    } else {
+      onClose();
+    }
+  };
+
+  const set = k => e => {
+    setIsDirty(true);
+    setForm(f => ({ ...f, [k]: e.target.value }));
+  };
 
   useEffect(() => {
     const cat = cats.find(c => c.id === form.category);
     if (cat) setForm(f => ({ ...f, type: cat.type }));
   }, [form.category, cats]);
 
-  const submit = () => {
-    if (!form.amount || isNaN(+form.amount) || +form.amount <= 0) return setErr('Enter a valid amount');
+  const submit = async () => {
+    if (submitting) return;
+    const amount = parseFloat(form.amount);
+    if (!amount || isNaN(amount) || amount <= 0) return setErr('Enter a valid amount');
+    if (!Number.isInteger(Math.round(amount * 100))) return setErr('Invalid amount format');
+    if (amount.toString().includes('.') && amount.toString().split('.')[1].length > 2) {
+      return setErr('Max 2 decimal places allowed');
+    }
+
     setErr('');
-    onSave({ ...form, amount: +form.amount });
+    setSubmitting(true);
+    try {
+      await onSave({ ...form, amount: Math.round(amount * 100) / 100 });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const currentCat = cats.find(c => c.id === form.category);
 
   return (
-    <div className="modal-back" onClick={e => e.target===e.currentTarget && onClose()}>
+    <div className="modal-back" onClick={e => e.target===e.currentTarget && handleClose()}>
       <div className="modal-box glow-in" style={{ position: 'relative' }}>
         <button 
-          onClick={onClose}
+          onClick={handleClose}
           style={{ position: 'absolute', top: '2rem', right: '2rem', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
         >
           <X size={20} />
@@ -131,9 +159,14 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
           {err && <div className="ferr">{err}</div>}
 
           <div style={{display:'flex', gap:'1.5rem', justifyContent:'flex-end', marginTop: '1rem'}}>
-            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="btn btn-gradient" style={{ padding: '14px 40px' }} onClick={submit}>
-              {initial?._id ? 'Save Changes' : `Add ${currentCat?.label||'Entry'}`}
+            <button className="btn btn-ghost" onClick={handleClose}>Cancel</button>
+            <button 
+              className="btn btn-gradient" 
+              style={{ padding: '14px 40px', opacity: submitting ? 0.6 : 1 }} 
+              onClick={submit}
+              disabled={submitting}
+            >
+              {submitting ? 'Saving...' : initial?._id ? 'Save Changes' : `Add ${currentCat?.label||'Entry'}`}
             </button>
           </div>
         </div>

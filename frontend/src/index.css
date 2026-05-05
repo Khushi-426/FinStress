@@ -667,15 +667,18 @@ input[type=number] {
 /* ── Modal ─────────────────────────────────────────────────── */
 .modal-back {
   position: fixed;
-  inset: 0;
-  background: rgba(42,46,59,0.25);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(42,46,59,0.3);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 200;
-  padding: 1rem;
+  z-index: 1000;
+  padding: 2rem;
 }
 .modal-box {
   background: var(--color-surface);
@@ -685,6 +688,7 @@ input[type=number] {
   width: 100%;
   max-width: 520px;
   max-height: 90vh;
+  margin: auto;
   overflow-y: auto;
   box-shadow: 0 20px 50px rgba(0,0,0,0.08);
 }
@@ -925,13 +929,45 @@ input[type=number] {
   100% { transform: translate(0, 0) scale(1); }
 }
 
-/* ── Responsive ────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .sidebar { display: none; }
-  .main    { margin-left: 0; padding: 1rem; }
-  .mg, .mg-4       { grid-template-columns: 1fr 1fr; }
-  .grid2, .grid3   { grid-template-columns: 1fr; }
-  [style*="gridTemplateColumns: minmax(0,2fr)"] {
-    grid-template-columns: 1fr !important;
-  }
+/* ── Mobile Responsiveness ─────────────────────────────────── */
+@media (max-width: 1024px) {
+  :root { --sidebar: 0px; }
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-xl); }
+  .main { margin-left: 0; max-width: 100vw; padding: 40px 1.5rem 6rem; }
 }
+
+@media (max-width: 768px) {
+  .story-title { font-size: 2.5rem; }
+  .story-hero { padding: 3rem 1.5rem; }
+  .story-hero-val { font-size: 3rem; }
+  .story-split { grid-template-columns: 1fr; gap: 3rem; }
+  .grid2, .grid3 { grid-template-columns: 1fr; gap: 1.5rem; }
+  .cat-tile-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+}
+
+@media (max-width: 640px) {
+  .modal-box {
+    padding: 2rem 1.5rem;
+    border-radius: 24px 24px 0 0;
+    max-height: 95vh;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-width: 100%;
+    margin: 0;
+    animation: slideUp 0.4s cubic-bezier(.4,0,.2,1) forwards;
+  }
+  
+  .cat-tile-grid { grid-template-columns: repeat(3, 1fr); }
+  
+  .story-header { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
+  .month-nav { width: 100%; justify-content: space-between; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+

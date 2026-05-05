@@ -2,11 +2,18 @@ import React from 'react';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { monthLabel } from '../utils/categories';
 
-export default function MonthNav({ month, onChange }) {
+const MonthNav = React.memo(({ month, onChange }) => {
   const shift = (delta) => {
     const [y, m] = month.split('-').map(Number);
     const d = new Date(y, m - 1 + delta, 1);
-    onChange(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    const newMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    
+    const MIN_MONTH = '2024-01';
+    const MAX_MONTH = new Date().toISOString().slice(0, 7);
+    
+    if (newMonth >= MIN_MONTH && newMonth <= MAX_MONTH) {
+      onChange(newMonth);
+    }
   };
   const isCurrentMonth = month === new Date().toISOString().slice(0,7);
 
@@ -36,4 +43,6 @@ export default function MonthNav({ month, onChange }) {
       )}
     </div>
   );
-}
+});
+
+export default MonthNav;

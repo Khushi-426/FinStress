@@ -4,9 +4,13 @@ const auth     = require('../middleware/auth');
 const Expense  = require('../models/Expense');
 const Budget   = require('../models/Budget');
 const Analysis = require('../models/Analysis');
+const logger   = require('../config/logger');
 
 const router  = express.Router();
-const ML_URL  = process.env.ML_SERVICE_URL || 'http://localhost:8000';
+if (!process.env.ML_SERVICE_URL && process.env.NODE_ENV === 'production') {
+  throw new Error('ML_SERVICE_URL env var is required in production');
+}
+const ML_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
 const PEER = {
   Freshman:  { avgStress:67.1, avgIncome:1561, avgExpenses:2189 },
@@ -17,7 +21,8 @@ const PEER = {
 
 function buildSuggestions(snap, ml, user) {
   const sugs = [];
-  const { byCategory, totalIncome, totalExpenses, savingsGap, discretionaryRatio, targets } = snap;
+  const { byCategory, totalIncome, totalExpenses, savingsGap, discretionaryRatio } = snap;
+  const targets = snap.targets || {};
 
   // Student Monthly Benchmarks (approximate in ₹)
   const BENCHMARKS = {
@@ -30,7 +35,7 @@ function buildSuggestions(snap, ml, user) {
   };
 
   // 1. Budget Overages (High Priority)
-  Object.keys(targets).forEach(cat => {
+  Object.keys(targets || {}).forEach(cat => {
     const actual = byCategory[cat] || 0;
     const target = targets[cat] || 0;
     if (target > 0 && actual > target) {
@@ -49,7 +54,7 @@ function buildSuggestions(snap, ml, user) {
 
   // 2. High Discretionary Spend
   if (discretionaryRatio > 0.3) {
-    const waste = Math.round((discretionaryRatio - 0.2) * totalIncome);
+    const waste = Math.round((discretionaryRatio - 0.2) * (totalIncome || 1));
     sugs.push({
       category: 'discretionary',
       severity: 'warn',
@@ -139,165 +144,216 @@ router.post('/run', auth, async (req, res) => {
     const start  = new Date(+y, +m - 1, 1);
     const end    = new Date(+y, +m, 1);
     const user   = req.user;
+    logger.info('Analysis run started', { userId: user._id, month });
 
-    // Aggregate expenses for the month
-    const agg = await Expense.aggregate([
-      { $match: { userId: user._id, date: { $gte: start, $lt: end } } },
-      { $group: { _id: { category: '$category', type: '$type' }, total: { $sum: '$amount' } } },
-    ]);
+    const session = await Expense.startSession();
+    session.startTransaction();
 
-    const byCategory = {};
-    let totalIncome = 0;
-    agg.forEach(({ _id, total }) => {
-      byCategory[_id.category] = (byCategory[_id.category] || 0) + total;
-      if (_id.category === 'income' || _id.category === 'financial_aid') totalIncome += total;
-    });
+    try {
+      // Optimized single aggregation pipeline
+      const agg = await Expense.aggregate([
+        { $match: { userId: user._id, date: { $gte: start, $lt: end }, deletedAt: null } },
+        {
+          $facet: {
+            byCategory: [
+              { $group: { _id: '$category', total: { $sum: '$amount' } } }
+            ],
+            byType: [
+              { $group: { _id: '$type', total: { $sum: '$amount' } } }
+            ]
+          }
+        }
+      ]).session(session);
 
-    // Pull budget for targets and fallback income
-    const budget = await Budget.findOne({ userId: user._id, month });
-    const targets = budget?.targets || {};
+      const facets = agg[0];
+      const byCategory = {};
+      facets.byCategory.forEach(c => byCategory[c._id] = c.total);
+      
+      let totalIncome = 0;
+      facets.byType.forEach(t => {
+        if (t._id === 'income') totalIncome = t.total;
+      });
+      // Fallback for income in custom categories
+      if (byCategory.income) totalIncome = Math.max(totalIncome, byCategory.income);
+      if (byCategory.financial_aid) totalIncome += (byCategory.financial_aid || 0);
 
-    // Combine Budget income (base) with Tracked income (extra/random)
-    const budgetIncome = (budget?.monthlyIncome || 0) + (budget?.financialAid || 0);
-    const trackedIncome = totalIncome; 
-    const finalIncome = budgetIncome + trackedIncome;
+      // Pull budget for targets and fallback income
+      const budget = await Budget.findOne({ userId: user._id, month }).session(session);
+      let targets = budget?.targets || {};
 
-    const tuitionMonthly    = (byCategory.tuition||0);
-    const housing           = byCategory.housing||0;
-    const food              = byCategory.food||0;
-    const transportation    = byCategory.transportation||0;
-    const booksSupplies     = byCategory.books_supplies||0;
-    const entertainment     = byCategory.entertainment||0;
-    const personalCare      = byCategory.personal_care||0;
-    const technology        = byCategory.technology||0;
-    const healthWellness    = byCategory.health_wellness||0;
-    const miscellaneous     = byCategory.miscellaneous||0;
-
-    const totalExpenses      = tuitionMonthly+housing+food+transportation+booksSupplies+entertainment+personalCare+technology+healthWellness+miscellaneous;
-    const savingsGap         = finalIncome - totalExpenses;
-    const expenseRatio       = finalIncome > 0 ? totalExpenses/finalIncome : 3;
-    const essentialSpend     = tuitionMonthly+housing+food+transportation+booksSupplies+healthWellness;
-    const discretionarySpend = entertainment+personalCare+technology+miscellaneous;
-    const discretionaryRatio = finalIncome > 0 ? discretionarySpend/finalIncome : 1;
-
-    // Calculate Budget Variance (Over-spending penalty)
-    let overBudgetAmount = 0;
-    Object.keys(targets).forEach(cat => {
-      const actual = byCategory[cat] || 0;
-      const target = targets[cat] || 0;
-      if (target > 0 && actual > target) {
-        overBudgetAmount += (actual - target);
+      // DEFENSIVE: Ensure targets is an object and initialized
+      if (!targets || typeof targets !== 'object') {
+        targets = {};
+        Object.keys(byCategory).forEach(cat => {
+          if (!targets[cat]) targets[cat] = 0;
+        });
       }
-    });
 
-    // Stress multiplier: If over budget, we artificially increase the perceived expense ratio for the ML
-    const budgetPenalty = overBudgetAmount > 0 ? (overBudgetAmount / Math.max(finalIncome, 1)) * 0.5 : 0;
-    const adjustedExpenseRatio = expenseRatio + budgetPenalty;
+      // Combine Budget income (base) with Tracked income (extra/random)
+      const budgetIncome = (budget?.monthlyIncome || 0) + (budget?.financialAid || 0);
+      const trackedIncome = totalIncome; 
+      const finalIncome = budgetIncome + trackedIncome;
 
-    const snapshot = { 
-      totalIncome: finalIncome, 
-      totalExpenses, 
-      savingsGap, 
-      expenseRatio, 
-      essentialSpend, 
-      discretionarySpend, 
-      discretionaryRatio, 
-      byCategory,
-      overBudgetAmount,
-      targets
-    };
+      const tuitionMonthly    = (byCategory.tuition||0);
+      const housing           = byCategory.housing||0;
+      const food              = byCategory.food||0;
+      const transportation    = byCategory.transportation||0;
+      const booksSupplies     = byCategory.books_supplies||0;
+      const entertainment     = byCategory.entertainment||0;
+      const personalCare      = byCategory.personal_care||0;
+      const technology        = byCategory.technology||0;
+      const healthWellness    = byCategory.health_wellness||0;
+      const miscellaneous     = byCategory.miscellaneous||0;
 
-    // Build ML feature vector
-    const features = {
-      age: user.age||20,
-      gender_enc:   { Male:0, Female:1, 'Non-binary':2 }[user.gender]??0,
-      year_enc:     { Freshman:1, Sophomore:2, Junior:3, Senior:4 }[user.yearInSchool]??1,
-      major_enc:    { Biology:0,'Computer Science':1, Economics:2, Engineering:3, Psychology:4, Other:5 }[user.major]??0,
-      payment_enc:  { 'Credit/Debit Card':0, Cash:1, 'Mobile Payment App':2 }[user.paymentMethod]??0,
-      monthly_income: finalIncome,
-      financial_aid: (budget?.financialAid || 0) + (byCategory.financial_aid||0),
-      tuition_monthly: tuitionMonthly,
-      housing, food, transportation,
-      books_supplies: booksSupplies,
-      entertainment, personal_care: personalCare,
-      technology, health_wellness: healthWellness, miscellaneous,
-    };
+      const totalExpenses      = tuitionMonthly+housing+food+transportation+booksSupplies+entertainment+personalCare+technology+healthWellness+miscellaneous;
+      const savingsGap         = finalIncome - totalExpenses;
+      
+      // Division by zero protection
+      const expenseRatio       = finalIncome > 0 ? totalExpenses / finalIncome : (totalExpenses > 0 ? 3 : 0);
+      const essentialSpend     = tuitionMonthly+housing+food+transportation+booksSupplies+healthWellness;
+      const discretionarySpend = entertainment+personalCare+technology+miscellaneous;
+      const discretionaryRatio = finalIncome > 0 ? discretionarySpend / finalIncome : 0;
 
-    // Call ML service
-    let mlResult;
+      // Calculate Budget Variance (Over-spending penalty)
+      let overBudgetAmount = 0;
+      Object.keys(targets).forEach(cat => {
+        const actual = byCategory[cat] || 0;
+        const target = targets[cat] || 0;
+        if (target > 0 && actual > target) {
+          overBudgetAmount += (actual - target);
+        }
+      });
 
-    // Safety check: If no expenses, stress should be zero regardless of features
-    if (totalExpenses === 0) {
-      mlResult = {
-        ft:  { stress_score: 0, stress_level: 'Low', confidence: 1.0 },
-        xgb: { stress_score: 0, stress_level: 'Low', prob_low: 1.0, prob_medium: 0, prob_high: 0 },
-        ensemble: { stress_score: 0, stress_level: 'Low' },
-        shap: { 
-          values: [], 
-          base_value: 0, 
-          top_risk: [], 
-          top_positive: ['Zero expenditure'] 
-        },
+      // Stress multiplier: If over budget, we artificially increase the perceived expense ratio for the ML
+      const budgetPenalty = overBudgetAmount > 0 ? (overBudgetAmount / Math.max(finalIncome, 1)) * 0.5 : 0;
+      const adjustedExpenseRatio = expenseRatio + budgetPenalty;
+
+      const snapshot = { 
+        totalIncome: finalIncome, 
+        totalExpenses, 
+        savingsGap, 
+        expenseRatio, 
+        essentialSpend, 
+        discretionarySpend, 
+        discretionaryRatio, 
+        byCategory,
+        overBudgetAmount,
+        targets
       };
-    } else {
-      try {
-        // We pass the adjusted ratio to influence the score if over budget
-        const mlFeatures = { ...features, expense_ratio: adjustedExpenseRatio };
-        const resp = await axios.post(`${ML_URL}/predict`, { features: mlFeatures }, { timeout: 10000 });
-        mlResult = resp.data;
-      } catch {
-        // Sophisticated rule-based fallback if ML service is down
-        const score = Math.max(0, Math.min(100, ((adjustedExpenseRatio - 0.3) / 1.7) * 100));
-        const level = score < 33 ? 'Low' : score < 66 ? 'Medium' : 'High';
-        
-        // Identify top spending categories for "simulated" SHAP
-        const sortedCats = Object.entries(byCategory)
-          .filter(([k]) => k !== 'income' && k !== 'financial_aid')
-          .sort((a, b) => b[1] - a[1]);
-        
-        const topRisk = sortedCats.slice(0, 3).map(([k]) => k.replace('_', ' '));
-        const topPos  = expenseRatio < 0.5 ? ['low expense ratio'] : [];
 
+      // Build ML feature vector
+      const features = {
+        age: user.age||20,
+        gender_enc:   { Male:0, Female:1, 'Non-binary':2 }[user.gender]??0,
+        year_enc:     { Freshman:1, Sophomore:2, Junior:3, Senior:4 }[user.yearInSchool]??1,
+        major_enc:    { Biology:0,'Computer Science':1, Economics:2, Engineering:3, Psychology:4, Other:5 }[user.major]??0,
+        payment_enc:  { 'Credit/Debit Card':0, Cash:1, 'Mobile Payment App':2 }[user.paymentMethod]??0,
+        monthly_income: Math.max(finalIncome, 1), // Prevent zero
+        financial_aid: (budget?.financialAid || 0) + (byCategory.financial_aid||0),
+        tuition_monthly: tuitionMonthly,
+        housing, food, transportation,
+        books_supplies: booksSupplies,
+        entertainment, personal_care: personalCare,
+        technology, health_wellness: healthWellness, miscellaneous,
+      };
+
+      // Call ML service
+      let mlResult;
+      let mlFallbackUsed = false;
+
+      // Safety check: If no expenses, stress should be zero regardless of features
+      if (totalExpenses === 0) {
         mlResult = {
-          ft:  { stress_score: Math.max(0, score - 5), stress_level: (score - 5) < 33 ? 'Low' : (score - 5) < 66 ? 'Medium' : 'High', confidence: 0.5 },
-          xgb: { stress_score: Math.min(100, score + 5), stress_level: (score + 5) < 33 ? 'Low' : (score + 5) < 66 ? 'Medium' : 'High', prob_low: level==='Low'?0.6:0.2, prob_medium: level==='Medium'?0.6:0.2, prob_high: level==='High'?0.6:0.2 },
-          ensemble: { stress_score: score, stress_level: level },
+          ft:  { stress_score: 0, stress_level: 'Low', confidence: 1.0 },
+          xgb: { stress_score: 0, stress_level: 'Low', prob_low: 1.0, prob_medium: 0, prob_high: 0 },
+          ensemble: { stress_score: 0, stress_level: 'Low' },
           shap: { 
-            values: sortedCats.slice(0, 6).map(([k, v]) => ({ display_name: k.replace('_', ' '), shap_value: (v / totalExpenses) * 15 })), 
-            base_value: 40, 
-            top_risk: topRisk.length ? topRisk : ['High spending'], 
-            top_positive: topPos 
+            values: [], 
+            base_value: 0, 
+            top_risk: [], 
+            top_positive: ['Zero expenditure'] 
           },
         };
+      } else {
+        try {
+          const mlFeatures = { ...features, expense_ratio: adjustedExpenseRatio };
+          const resp = await axios.post(`${ML_URL}/predict`, { features: mlFeatures }, { timeout: 10000 });
+          mlResult = resp.data;
+        } catch (err) {
+          console.error('[ML SERVICE] Error:', err.message);
+          mlFallbackUsed = true;
+          
+          // IMPROVED FALLBACK: Use actual expense data instead of hardcoded rules
+          const score = Math.max(0, Math.min(100, ((adjustedExpenseRatio - 0.3) / 1.7) * 100));
+          const level = score < 33 ? 'Low' : score < 66 ? 'Medium' : 'High';
+          
+          const sortedCats = Object.entries(byCategory)
+            .filter(([k]) => k !== 'income' && k !== 'financial_aid')
+            .sort((a, b) => b[1] - a[1]);
+          
+          const topRisk = sortedCats.slice(0, 3).map(([k]) => k.replace('_', ' '));
+          const topPos  = expenseRatio < 0.5 ? ['low expense ratio'] : [];
+
+          mlResult = {
+            ft:  { stress_score: Math.max(0, score - 5), stress_level: (score - 5) < 33 ? 'Low' : (score - 5) < 66 ? 'Medium' : 'High', confidence: 0.5 },
+            xgb: { stress_score: Math.min(100, score + 5), stress_level: (score + 5) < 33 ? 'Low' : (score + 5) < 66 ? 'Medium' : 'High', prob_low: level==='Low'?0.6:0.2, prob_medium: level==='Medium'?0.6:0.2, prob_high: level==='High'?0.6:0.2 },
+            ensemble: { stress_score: score, stress_level: level },
+            shap: { 
+              values: sortedCats.slice(0, 6).map(([k, v]) => ({ display_name: k.replace('_', ' '), shap_value: (v / (totalExpenses || 1)) * 15 })), 
+              base_value: 40, 
+              top_risk: topRisk.length ? topRisk : ['High spending'], 
+              top_positive: topPos 
+            },
+          };
+        }
       }
+
+      const ml = {
+        ftStressScore:  mlResult.ft.stress_score,
+        ftStressLevel:  mlResult.ft.stress_level,
+        xgbStressScore: mlResult.xgb.stress_score,
+        xgbStressLevel: mlResult.xgb.stress_level,
+        xgbProbLow:     mlResult.xgb.prob_low,
+        xgbProbMedium:  mlResult.xgb.prob_medium,
+        xgbProbHigh:    mlResult.xgb.prob_high,
+        ensembleScore:  mlResult.ensemble.stress_score,
+        ensembleLevel:  mlResult.ensemble.stress_level,
+        shapValues:     mlResult.shap.values,
+        shapBaseValue:  mlResult.shap.base_value,
+        topRiskFactors: mlResult.shap.top_risk,
+        topPositiveFactors: mlResult.shap.top_positive,
+      };
+
+      const suggestions = buildSuggestions(snapshot, ml, user);
+
+      const analysis = await Analysis.findOneAndUpdate(
+        { userId: user._id, month },
+        { 
+          snapshot, 
+          ml, 
+          suggestions,
+          ml_fallback_used: mlFallbackUsed,
+          fallback_timestamp: mlFallbackUsed ? new Date() : null
+        },
+        { upsert: true, new: true, session }
+      );
+
+      await session.commitTransaction();
+      logger.info('Analysis completed successfully', { userId: user._id, month, analysisId: analysis._id });
+      res.json({ analysisId: analysis._id, month, snapshot, ml, suggestions });
+    } catch (err) {
+      await session.abortTransaction();
+      if (err.code === 11000) {
+        // Handle race condition: if duplicate created during transaction, fetch existing
+        const existing = await Analysis.findOne({ userId: user._id, month });
+        if (existing) return res.json(existing);
+      }
+      throw err;
+    } finally {
+      session.endSession();
     }
-
-    const ml = {
-      ftStressScore:  mlResult.ft.stress_score,
-      ftStressLevel:  mlResult.ft.stress_level,
-      xgbStressScore: mlResult.xgb.stress_score,
-      xgbStressLevel: mlResult.xgb.stress_level,
-      xgbProbLow:     mlResult.xgb.prob_low,
-      xgbProbMedium:  mlResult.xgb.prob_medium,
-      xgbProbHigh:    mlResult.xgb.prob_high,
-      ensembleScore:  mlResult.ensemble.stress_score,
-      ensembleLevel:  mlResult.ensemble.stress_level,
-      shapValues:     mlResult.shap.values,
-      shapBaseValue:  mlResult.shap.base_value,
-      topRiskFactors: mlResult.shap.top_risk,
-      topPositiveFactors: mlResult.shap.top_positive,
-    };
-
-    const suggestions = buildSuggestions(snapshot, ml, user);
-
-    const analysis = await Analysis.findOneAndUpdate(
-      { userId: user._id, month },
-      { snapshot, ml, suggestions },
-      { upsert: true, new: true }
-    );
-
-    res.json({ analysisId: analysis._id, month, snapshot, ml, suggestions });
   } catch (err) {
+    logger.error('Analysis failed', { userId: req.user?._id, month: req.body?.month, error: err.message });
     console.error(err);
     res.status(500).json({ error: err.message });
   }

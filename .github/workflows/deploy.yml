@@ -1,0 +1,74 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      mongodb:
+        image: mongo:5
+        options: >-
+          --health-cmd="mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+        ports:
+          - 27017:27017
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+      
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+      
+      - name: Lint backend
+        run: cd backend && npm run lint --if-present
+      
+      - name: Build frontend
+        run: cd frontend && npm run build
+        env:
+          REACT_APP_API_URL: http://localhost:5000
+          REACT_APP_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      
+      - name: Run backend tests
+        run: cd backend && npm test --if-present
+        env:
+          MONGO_URI: mongodb://localhost:27017/finstress-test
+          JWT_SECRET: test-secret
+          ML_SERVICE_URL: http://localhost:8000
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./backend/coverage/lcov.info
+
+  deploy:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Deploy to Render
+        run: |
+          curl --request POST \
+            --header "accept: application/json" \
+            --header "content-type: application/json" \
+            --header "authorization: Bearer ${{ secrets.RENDER_DEPLOY_KEY }}" \
+            --url https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?fastDeploy=true

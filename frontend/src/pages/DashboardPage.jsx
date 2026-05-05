@@ -15,6 +15,8 @@ import {
 import api from "../utils/api";
 import { useAuth } from "../context/AuthContext";
 import MonthNav from "../components/MonthNav";
+import LoadingState from "../components/LoadingState";
+import ErrorState from "../components/ErrorState";
 import {
   fmt,
   currentMonth,
@@ -29,9 +31,11 @@ export default function DashboardPage() {
   const [analyses, setAnalyses] = useState([]);
   const [budget, setBudget] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
+    setErr("");
     try {
       const [sumR, dayR, anaR, budR] = await Promise.all([
         api.get(`/expenses/summary?month=${month}`),
@@ -43,7 +47,10 @@ export default function DashboardPage() {
       setDaily(Array.isArray(dayR.data) ? dayR.data : []);
       setAnalyses(Array.isArray(anaR.data) ? anaR.data : []);
       setBudget(budR.data?._id ? budR.data : null);
-    } catch (e) { console.error("Dashboard load error:", e); }
+    } catch (e) {
+      console.error("Dashboard load error:", e);
+      setErr(e.message);
+    }
     setLoading(false);
   }, [month]);
 
@@ -73,12 +80,23 @@ export default function DashboardPage() {
 
   const insightColor = savingsGap < 0 ? "var(--red)" : spendPct > 80 ? "var(--amber)" : "var(--green)";
 
-  const tooltipStyle = {
-    fontSize: 12, borderRadius: 12,
-    background: "var(--color-surface)",
-    border: "1px solid var(--color-border)",
-    boxShadow: "none",
-  };
+  const CustomTooltip = React.memo(({ active, payload }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="custom-tooltip" style={{
+          background: "var(--color-surface)",
+          padding: "10px 15px",
+          border: "1px solid var(--color-border)",
+          borderRadius: "12px",
+          boxShadow: "var(--shadow-md)"
+        }}>
+          <p style={{ margin: 0, fontSize: "11px", fontWeight: 600, color: "var(--color-text-secondary)" }}>{payload[0].payload.date}</p>
+          <p style={{ margin: 0, fontSize: "13px", fontWeight: 700, color: "var(--color-primary)" }}>{fmt(payload[0].value)}</p>
+        </div>
+      );
+    }
+    return null;
+  });
 
   return (
     <div className="fade-up page">
@@ -91,7 +109,9 @@ export default function DashboardPage() {
       </header>
 
       {loading ? (
-        <div className="spin-full"><div className="spin" /></div>
+        <LoadingState message="Fetching your financial snapshot..." />
+      ) : err ? (
+        <ErrorState error={err} onRetry={load} />
       ) : (
         <div>
           
@@ -121,7 +141,7 @@ export default function DashboardPage() {
                   <BarChart data={dailyAccum} margin={{ left: 0, right: 0 }}>
                     <XAxis dataKey="date" tick={{ fontSize: 10, fill: "var(--color-text-secondary)" }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 10, fill: "var(--color-text-secondary)" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${v}`} />
-                    <Tooltip formatter={(v) => [`₹${v}`, "Spent"]} contentStyle={tooltipStyle} />
+                    <Tooltip content={<CustomTooltip />} />
                     <Bar dataKey="daily" radius={[6, 6, 0, 0]}>
                       {dailyAccum.map((d, i) => (
                         <Cell key={i} fill={d.daily > (totalExpenses / 30) * 1.5 ? "var(--color-primary)" : "var(--color-secondary)"} />

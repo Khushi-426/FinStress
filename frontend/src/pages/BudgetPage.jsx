@@ -200,7 +200,7 @@ export default function BudgetPage() {
                               <span style={{fontSize:18,fontWeight:600}}>{cat.label}</span>
                               <button 
                                 className="btn btn-xs btn-ghost" 
-                                style={{ color: 'var(--red)', border: 'none', padding: '4px', opacity: 0.4 }}
+                                style={{ color: 'var(--red)', border: 'none', padding: '4px', opacity: 0.85 }}
                                 onClick={() => deleteCategory(cat.id)}
                                 title="Remove category from budget"
                               >

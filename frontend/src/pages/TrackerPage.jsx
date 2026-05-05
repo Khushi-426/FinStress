@@ -1,9 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Pencil, Trash2, Repeat, Inbox, Plus, List, DollarSign, AlertTriangle } from 'lucide-react';
+import { Pencil, Trash2, Repeat, Inbox, Plus, List, DollarSign, AlertTriangle, Download, Save } from 'lucide-react';
 import api from '../utils/api';
 import MonthNav    from '../components/MonthNav';
 import ExpenseModal from '../components/ExpenseModal';
+import LoadingState from '../components/LoadingState';
+import ErrorState   from '../components/ErrorState';
+import DOMPurify    from 'dompurify';
 import { getMergedExpenseCats, getMergedCategories, fmt, currentMonth } from '../utils/categories';
 import { useAuth } from '../context/AuthContext';
 
@@ -37,19 +40,23 @@ export default function TrackerPage() {
   const [showModal,setShowModal]= useState(false);
   const [editing,  setEditing]  = useState(null);
   const [filter,   setFilter]   = useState('all');
+  const [err,      setErr]      = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
+    setErr('');
     try {
       const [eR, sR, bR] = await Promise.all([
         api.get(`/expenses?month=${month}&limit=500`),
         api.get(`/expenses/summary?month=${month}`),
         api.get(`/budget?month=${month}`),
       ]);
-      setItems(eR.data);
+      setItems(eR.data.items || eR.data); // Handle both old and paginated response
       setSummary(sR.data);
       setBudget(bR.data._id ? bR.data : null);
-    } catch {}
+    } catch (e) {
+      setErr(e.message);
+    }
     setLoading(false);
   }, [month]);
 
@@ -57,18 +64,37 @@ export default function TrackerPage() {
 
   const handleSave = async (form) => {
     try {
+      let resp;
       if (editing?._id) {
-        const { data } = await api.patch(`/expenses/${editing._id}`, form);
-        setItems(prev => prev.map(e => e._id===editing._id ? data : e));
+        resp = await api.patch(`/expenses/${editing._id}`, form);
+        setItems(prev => prev.map(e => e._id===editing._id ? resp.data : e));
       } else {
-        const { data } = await api.post('/expenses', form);
-        setItems(prev => [data, ...prev]);
+        resp = await api.post('/expenses', form);
+        setItems(prev => [resp.data, ...prev]);
       }
+      
+      if (resp.data.alert) {
+        alert(resp.data.alert.message);
+      }
+
       const sR = await api.get(`/expenses/summary?month=${month}`);
       setSummary(sR.data);
     } catch(e) { alert(e.message); }
     setShowModal(false);
     setEditing(null);
+  };
+
+  const handleExport = async () => {
+    try {
+      const resp = await api.get(`/expenses/export?month=${month}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([resp.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `finstress-${month}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (e) { alert('Export failed'); }
   };
 
   const handleDelete = async (id) => {
@@ -111,6 +137,9 @@ export default function TrackerPage() {
           <p className="story-subtitle">The timeline of your financial activities.</p>
         </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+          <button className="btn btn-ghost" style={{ padding: '12px 20px' }} onClick={handleExport}>
+            <Download size={16} /> Export
+          </button>
           <MonthNav month={month} onChange={setMonth}/>
           <button 
             className={`btn ${budget ? 'btn-gradient' : 'btn-ghost'}`} 
@@ -160,14 +189,24 @@ export default function TrackerPage() {
           ))}
         </div>
 
-        {loading ? <div className="spin-full"><div className="spin"/></div> : (
+        {loading ? <LoadingState message="Fetching your transactions..." /> : err ? <ErrorState error={err} onRetry={load} /> : (
           !isBudgetComplete ? (
             <div style={{textAlign:'center',padding:'8rem 0', background: 'var(--surface2)', borderRadius: '32px', border: '2px dashed var(--color-border)'}}>
               <AlertTriangle size={64} strokeWidth={1} style={{margin:'0 auto 2rem',color:'var(--red)', opacity: 0.8}}/>
-              <h2 style={{ fontFamily: 'var(--serif)', fontSize: '2.5rem', marginBottom: '1rem' }}>Plan Your Path First.</h2>
-              <p style={{color:'var(--color-text-secondary)',fontSize:18,marginBottom:'3rem', maxWidth: '550px', margin: '0 auto 3rem'}}>
+              <h2 style={{ fontFamily: 'var(--serif)', fontSize: '2.5rem', marginBottom: '1rem' }}>One quick setup needed.</h2>
+              <p style={{color:'var(--color-text-secondary)',fontSize:18,marginBottom:'1rem', maxWidth: '550px', margin: '0 auto 1rem'}}>
                 To provide accurate stress analysis, you must assign a spending target to **every category** in your budget before tracking expenses.
               </p>
+              
+              <div style={{maxWidth:'400px', margin:'0 auto 3rem', padding:'1.5rem', background:'var(--color-surface)', borderRadius:'16px', textAlign:'left', border:'1px solid var(--color-border)'}}>
+                <strong style={{fontSize:'14px', color:'var(--color-text-primary)'}}>Missing targets for:</strong>
+                <ul style={{listStyle:'none', paddingLeft:0, marginTop:'0.75rem', display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px'}}>
+                  {expenseCats.filter(c => !(c.id in (budget?.targets || {}))).map(c => (
+                    <li key={c.id} style={{fontSize:'13px', color:'var(--red)'}}>✗ {c.label}</li>
+                  ))}
+                </ul>
+              </div>
+
               <button 
                 className="btn btn-gradient" 
                 style={{ padding: '16px 48px', fontSize: '18px' }} 
@@ -202,25 +241,29 @@ export default function TrackerPage() {
                     
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                       {exps.map(e => {
-                        const cat = getMergedCategories(user?.customCategories).find(c => c.id === e.category) || { icon: null, label: e.category, color:'#888' };
+                        const allCats = getMergedCategories(user?.customCategories);
+                        const cat = allCats.find(c => c.id === e.category) || { icon: '📦', label: e.category, color:'#90a4ae' };
                         const isInc = e.type==='income'||e.category==='financial_aid';
                         return (
                           <div key={e._id} style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                            <div style={{ fontSize: '24px', background: cat.color+'15', width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ fontSize: '24px', background: (cat.color || '#90a4ae')+'15', width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                               {cat.icon}
                             </div>
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '1.1rem', fontWeight: 600 }}>{cat.label}</span>
                                 <span style={{ fontSize: '1.1rem', fontWeight: 700, color: isInc ? 'var(--green)' : 'var(--color-primary-dark)' }}>
-                                  {isInc ? '+' : '−'}{fmt(e.amount)}
+                                  {isInc ? '+ ' : '− '}{fmt(Math.abs(e.amount))}
                                 </span>
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}>{e.note || 'No description'}</span>
+                                <span 
+                                  style={{ fontSize: '0.9rem', color: 'var(--color-text-secondary)' }}
+                                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(e.note || 'No description') }}
+                                />
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                                   <button className="btn btn-xs btn-ghost" style={{ border: 'none' }} onClick={()=>{setEditing(e);setShowModal(true);}}><Pencil size={14} /></button>
-                                  <button className="btn btn-xs btn-ghost" style={{ border: 'none', color: 'var(--red)' }} onClick={()=>handleDelete(e._id)}><Trash2 size={14} /></button>
+                                  <button className="btn btn-xs btn-ghost" style={{ border: 'none', color: 'var(--red)', opacity: 0.85 }} onClick={()=>handleDelete(e._id)}><Trash2 size={14} /></button>
                                 </div>
                               </div>
                             </div>

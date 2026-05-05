@@ -28,9 +28,12 @@ const analysisSchema = new mongoose.Schema({
     topRiskFactors: [String],
     topPositiveFactors: [String],
   },
-  suggestions: [{ category: String, severity: String, title: String, text: String, potential: Number }],
+  suggestions: [{ category: String, severity: String, title: String, text: String, potential: Number, impact: String }],
+  ml_fallback_used: { type: Boolean, default: false },
+  fallback_timestamp: { type: Date },
   createdAt: { type: Date, default: Date.now },
 });
 
-analysisSchema.index({ userId: 1, month: 1 });
+analysisSchema.index({ userId: 1, month: 1 }, { unique: true });
+
 module.exports = mongoose.model('Analysis', analysisSchema);

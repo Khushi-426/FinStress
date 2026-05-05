@@ -20,7 +20,15 @@ export const INCOME_CATS  = CATEGORIES.filter(c => c.type === 'income');
 export const getMergedCategories = (custom = []) => {
   const merged = [...CATEGORIES];
   custom.forEach(c => {
-    if (!merged.find(m => m.id === c.id)) merged.push(c);
+    if (!merged.find(m => m.id === c.id)) {
+      merged.push({
+        id: c.id,
+        label: c.label,
+        icon: c.icon || '📦',
+        type: c.type || 'expense',
+        color: c.color || '#90a4ae'
+      });
+    }
   });
   return merged;
 };
