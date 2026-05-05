@@ -17,43 +17,118 @@ const PEER = {
 
 function buildSuggestions(snap, ml, user) {
   const sugs = [];
-  const { byCategory, totalIncome, totalExpenses, savingsGap, discretionaryRatio } = snap;
+  const { byCategory, totalIncome, totalExpenses, savingsGap, discretionaryRatio, targets } = snap;
 
-  if (savingsGap < 0) sugs.push({ category:'budget', severity:'danger',
-    title:'Monthly deficit detected',
-    text:`You spent $${Math.abs(Math.round(savingsGap))} more than you earned this month. This is your biggest stress driver — cut expenses or increase income.`,
-    potential: Math.abs(Math.round(savingsGap)) });
+  // Student Monthly Benchmarks (approximate in ₹)
+  const BENCHMARKS = {
+    food: 6000,
+    transportation: 3000,
+    entertainment: 2500,
+    personal_care: 2000,
+    technology: 3000,
+    miscellaneous: 2000
+  };
 
-  if ((byCategory.entertainment||0) > 120) sugs.push({ category:'entertainment', severity:'danger',
-    title:'Entertainment is high',
-    text:`You spent $${Math.round(byCategory.entertainment)}/mo on entertainment. Student average is ~$85. Cutting to average saves $${Math.round((byCategory.entertainment||0)-85)}/mo.`,
-    potential: Math.round((byCategory.entertainment||0)-85) });
+  // 1. Budget Overages (High Priority)
+  Object.keys(targets).forEach(cat => {
+    const actual = byCategory[cat] || 0;
+    const target = targets[cat] || 0;
+    if (target > 0 && actual > target) {
+      const diff = actual - target;
+      const displayCat = cat.replace('_', ' ');
+      sugs.push({
+        category: cat,
+        severity: 'danger',
+        title: `Over Budget: ${displayCat}`,
+        text: `You exceeded your ${displayCat} target by ₹${Math.round(diff)}. To lower your stress, try capping this category next month.`,
+        potential: Math.round(diff),
+        impact: 'High'
+      });
+    }
+  });
 
-  if ((byCategory.food||0) > 320) sugs.push({ category:'food', severity:'warn',
-    title:'Food costs above average',
-    text:`$${Math.round(byCategory.food)}/mo on food is above the ~$253 student average. Meal prepping 3 days/week can cut this by 20–25%.`,
-    potential: Math.round((byCategory.food||0)*0.22) });
+  // 2. High Discretionary Spend
+  if (discretionaryRatio > 0.3) {
+    const waste = Math.round((discretionaryRatio - 0.2) * totalIncome);
+    sugs.push({
+      category: 'discretionary',
+      severity: 'warn',
+      title: 'High Non-Essential Spending',
+      text: `${Math.round(discretionaryRatio * 100)}% of your income goes to non-essentials. Reducing this to 20% would save you approx ₹${waste} and significantly lower your stress score.`,
+      potential: waste,
+      impact: 'Medium'
+    });
+  }
 
-  if ((byCategory.technology||0) > 200) sugs.push({ category:'technology', severity:'warn',
-    title:'High technology spend',
-    text:`$${Math.round(byCategory.technology)}/mo on technology. Review active subscriptions — many have free student tiers.`,
-    potential: Math.round((byCategory.technology||0)-180) });
+  // 3. Category-Specific Advice (Benchmarked)
+  if ((byCategory.food || 0) > BENCHMARKS.food) {
+    sugs.push({
+      category: 'food',
+      severity: 'warn',
+      title: 'Optimization: Food & Dining',
+      text: `Your food spending (₹${Math.round(byCategory.food)}) is above the typical student average. Meal prepping just 3 days a week can reduce dining costs by up to 30%.`,
+      potential: Math.round(byCategory.food * 0.3),
+      impact: 'Medium'
+    });
+  }
 
-  if (discretionaryRatio > 0.3) sugs.push({ category:'discretionary', severity:'warn',
-    title:'Discretionary spending above 30%',
-    text:`${Math.round(discretionaryRatio*100)}% of your income goes to non-essential spending. Target is below 20%.`,
-    potential: Math.round((discretionaryRatio - 0.2) * totalIncome) });
+  if ((byCategory.transportation || 0) > BENCHMARKS.transportation) {
+    sugs.push({
+      category: 'transportation',
+      severity: 'warn',
+      title: 'Commute Efficiency',
+      text: `Transportation costs are high. Consider student transit passes or carpooling to save roughly ₹${Math.round(byCategory.transportation * 0.2)} monthly.`,
+      potential: Math.round(byCategory.transportation * 0.2),
+      impact: 'Low'
+    });
+  }
 
-  if (ml.ensembleScore < 40 && savingsGap > 100) sugs.push({ category:'savings', severity:'good',
-    title:'Great — start investing your surplus',
-    text:`You have a $${Math.round(savingsGap)}/mo surplus. Consider putting $${Math.round(savingsGap*0.5)} into a high-yield savings account each month.`,
-    potential: 0 });
+  if ((byCategory.technology || 0) > BENCHMARKS.technology) {
+    sugs.push({
+      category: 'technology',
+      severity: 'warn',
+      title: 'Subscription Audit',
+      text: `Tech spending detected. Audit your active subscriptions for unused services or switch to 'Student Tiers' where available.`,
+      potential: 500,
+      impact: 'Medium'
+    });
+  }
 
-  if (sugs.length === 0) sugs.push({ category:'general', severity:'good',
-    title:'Your finances look healthy this month',
-    text:'Keep tracking consistently to spot trends over time.', potential: 0 });
+  // 4. Savings Gap Advice
+  if (savingsGap < 0) {
+    sugs.push({
+      category: 'budget',
+      severity: 'danger',
+      title: 'Critical: Living Above Means',
+      text: `You are running a ₹${Math.abs(Math.round(savingsGap))} deficit. This is a major stress driver. We recommend a "no-spend" week on non-essentials to bridge this gap immediately.`,
+      potential: Math.abs(Math.round(savingsGap)),
+      impact: 'Critical'
+    });
+  } else if (savingsGap > 5000 && ml.ensembleScore < 40) {
+    sugs.push({
+      category: 'savings',
+      severity: 'good',
+      title: 'Resilience Strategy: Surplus detected',
+      text: `Great work! You have a ₹${Math.round(savingsGap)} surplus. Move ₹${Math.round(savingsGap * 0.4)} to an emergency fund to build long-term financial resilience.`,
+      potential: 0,
+      impact: 'High'
+    });
+  }
 
-  return sugs;
+  // Ensure at least one suggestion
+  if (sugs.length === 0) {
+    sugs.push({
+      category: 'general',
+      severity: 'good',
+      title: 'Financial Health Maintained',
+      text: 'You are managing your budget exceptionally well. Continue this discipline to maintain your low stress level.',
+      potential: 0,
+      impact: 'Low'
+    });
+  }
+
+  // Sort by potential savings descending
+  return sugs.sort((a, b) => b.potential - a.potential);
 }
 
 // POST /api/analysis/run?month=2024-03
@@ -150,35 +225,51 @@ router.post('/run', auth, async (req, res) => {
 
     // Call ML service
     let mlResult;
-    try {
-      // We pass the adjusted ratio to influence the score if over budget
-      const mlFeatures = { ...features, expense_ratio: adjustedExpenseRatio };
-      const resp = await axios.post(`${ML_URL}/predict`, { features: mlFeatures }, { timeout: 10000 });
-      mlResult = resp.data;
-    } catch {
-      // Sophisticated rule-based fallback if ML service is down
-      const score = Math.max(0, Math.min(100, ((adjustedExpenseRatio - 0.3) / 1.7) * 100));
-      const level = score < 33 ? 'Low' : score < 66 ? 'Medium' : 'High';
-      
-      // Identify top spending categories for "simulated" SHAP
-      const sortedCats = Object.entries(byCategory)
-        .filter(([k]) => k !== 'income' && k !== 'financial_aid')
-        .sort((a, b) => b[1] - a[1]);
-      
-      const topRisk = sortedCats.slice(0, 3).map(([k]) => k.replace('_', ' '));
-      const topPos  = expenseRatio < 0.5 ? ['low expense ratio'] : [];
 
+    // Safety check: If no expenses, stress should be zero regardless of features
+    if (totalExpenses === 0) {
       mlResult = {
-        ft:  { stress_score: Math.max(0, score - 5), stress_level: (score - 5) < 33 ? 'Low' : (score - 5) < 66 ? 'Medium' : 'High', confidence: 0.5 },
-        xgb: { stress_score: Math.min(100, score + 5), stress_level: (score + 5) < 33 ? 'Low' : (score + 5) < 66 ? 'Medium' : 'High', prob_low: level==='Low'?0.6:0.2, prob_medium: level==='Medium'?0.6:0.2, prob_high: level==='High'?0.6:0.2 },
-        ensemble: { stress_score: score, stress_level: level },
+        ft:  { stress_score: 0, stress_level: 'Low', confidence: 1.0 },
+        xgb: { stress_score: 0, stress_level: 'Low', prob_low: 1.0, prob_medium: 0, prob_high: 0 },
+        ensemble: { stress_score: 0, stress_level: 'Low' },
         shap: { 
-          values: sortedCats.slice(0, 6).map(([k, v]) => ({ display_name: k.replace('_', ' '), shap_value: (v / totalExpenses) * 15 })), 
-          base_value: 40, 
-          top_risk: topRisk.length ? topRisk : ['High spending'], 
-          top_positive: topPos 
+          values: [], 
+          base_value: 0, 
+          top_risk: [], 
+          top_positive: ['Zero expenditure'] 
         },
       };
+    } else {
+      try {
+        // We pass the adjusted ratio to influence the score if over budget
+        const mlFeatures = { ...features, expense_ratio: adjustedExpenseRatio };
+        const resp = await axios.post(`${ML_URL}/predict`, { features: mlFeatures }, { timeout: 10000 });
+        mlResult = resp.data;
+      } catch {
+        // Sophisticated rule-based fallback if ML service is down
+        const score = Math.max(0, Math.min(100, ((adjustedExpenseRatio - 0.3) / 1.7) * 100));
+        const level = score < 33 ? 'Low' : score < 66 ? 'Medium' : 'High';
+        
+        // Identify top spending categories for "simulated" SHAP
+        const sortedCats = Object.entries(byCategory)
+          .filter(([k]) => k !== 'income' && k !== 'financial_aid')
+          .sort((a, b) => b[1] - a[1]);
+        
+        const topRisk = sortedCats.slice(0, 3).map(([k]) => k.replace('_', ' '));
+        const topPos  = expenseRatio < 0.5 ? ['low expense ratio'] : [];
+
+        mlResult = {
+          ft:  { stress_score: Math.max(0, score - 5), stress_level: (score - 5) < 33 ? 'Low' : (score - 5) < 66 ? 'Medium' : 'High', confidence: 0.5 },
+          xgb: { stress_score: Math.min(100, score + 5), stress_level: (score + 5) < 33 ? 'Low' : (score + 5) < 66 ? 'Medium' : 'High', prob_low: level==='Low'?0.6:0.2, prob_medium: level==='Medium'?0.6:0.2, prob_high: level==='High'?0.6:0.2 },
+          ensemble: { stress_score: score, stress_level: level },
+          shap: { 
+            values: sortedCats.slice(0, 6).map(([k, v]) => ({ display_name: k.replace('_', ' '), shap_value: (v / totalExpenses) * 15 })), 
+            base_value: 40, 
+            top_risk: topRisk.length ? topRisk : ['High spending'], 
+            top_positive: topPos 
+          },
+        };
+      }
     }
 
     const ml = {

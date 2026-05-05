@@ -4,7 +4,7 @@ import api from '../utils/api';
 import MonthNav from '../components/MonthNav';
 import { getMergedExpenseCats, fmt, currentMonth } from '../utils/categories';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Tag } from 'lucide-react';
+import { Plus, Tag, Trash2 } from 'lucide-react';
 
 export default function BudgetPage() {
   const { user, refresh } = useAuth();
@@ -52,6 +52,17 @@ export default function BudgetPage() {
       await refresh();
       setNewCat({ label: '', icon: '📦' });
       setShowAdd(false);
+    } catch (e) { alert(e.message); }
+  };
+
+  const deleteCategory = async (catId) => {
+    if (!window.confirm('Are you sure you want to delete this category? All related budget targets will be reset.')) return;
+    try {
+      await api.delete(`/auth/categories/${catId}`);
+      await refresh();
+      const newTargets = { ...targets };
+      delete newTargets[catId];
+      setTargets(newTargets);
     } catch (e) { alert(e.message); }
   };
 
@@ -138,16 +149,22 @@ export default function BudgetPage() {
             </div>
 
             {showAdd && (
-              <div className="highlight-panel" style={{ marginBottom: '4rem', display: 'flex', gap: '2rem', alignItems: 'flex-end', background: 'var(--surface2)' }}>
-                <div className="fg" style={{ flex: 1 }}>
-                  <label>Category Name</label>
-                  <input type="text" value={newCat.label} onChange={e => setNewCat(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Subscriptions" />
+              <div className="fade-in highlight-panel" style={{ marginBottom: '4rem', padding: '2.5rem', background: 'var(--color-secondary)', borderRadius: '24px', border: '1px solid var(--color-primary)' }}>
+                <h3 style={{ fontFamily: 'var(--serif)', fontSize: '1.5rem', marginBottom: '1.5rem' }}>New Category</h3>
+                <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-end' }}>
+                  <div className="fg" style={{ flex: 1 }}>
+                    <label>What should we call it?</label>
+                    <input type="text" value={newCat.label} onChange={e => setNewCat(p => ({ ...p, label: e.target.value }))} placeholder="e.g. Subscriptions" />
+                  </div>
+                  <div className="fg" style={{ width: '100px' }}>
+                    <label>Icon/Emoji</label>
+                    <input type="text" value={newCat.icon} onChange={e => setNewCat(p => ({ ...p, icon: e.target.value }))} style={{ textAlign: 'center', fontSize: '1.5rem' }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: '1rem' }}>
+                    <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+                    <button className="btn btn-primary" onClick={addCategory} style={{ padding: '12px 32px' }}>Create Category</button>
+                  </div>
                 </div>
-                <div className="fg" style={{ width: '80px' }}>
-                  <label>Emoji</label>
-                  <input type="text" value={newCat.icon} onChange={e => setNewCat(p => ({ ...p, icon: e.target.value }))} style={{ textAlign: 'center' }} />
-                </div>
-                <button className="btn btn-primary" onClick={addCategory} style={{ padding: '12px 24px' }}>Add</button>
               </div>
             )}
             
@@ -167,6 +184,15 @@ export default function BudgetPage() {
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                             <span style={{fontSize:18,fontWeight:600}}>{cat.label}</span>
+                            {user?.customCategories?.find(cc => cc.id === cat.id) && (
+                              <button 
+                                className="btn btn-xs btn-ghost" 
+                                style={{ color: 'var(--red)', border: 'none', padding: '4px' }}
+                                onClick={() => deleteCategory(cat.id)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                             {actual > 0 && (
                               <span style={{ fontSize: 14, color: over ? 'var(--red)' : 'var(--color-text-secondary)', fontWeight: 600 }}>
                                 {fmt(actual)} spent
@@ -190,7 +216,7 @@ export default function BudgetPage() {
                       <label>Target Amount</label>
                       <div className="soft-input-wrap">
                         <span className="soft-input-prefix">₹</span>
-                        <input type="number" value={targets[cat.id]||''} onChange={set(cat.id)} placeholder="No limit" min="0"/>
+                        <input type="number" value={targets[cat.id] === undefined ? '' : targets[cat.id]} onChange={set(cat.id)} placeholder="0" min="0"/>
                       </div>
                     </div>
                   </div>

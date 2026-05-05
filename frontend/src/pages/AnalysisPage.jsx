@@ -49,7 +49,7 @@ function FluidMeter({ score, level }) {
       <div style={{ maxWidth: '300px' }}>
         <h3 style={{ marginBottom: '1rem', fontSize: '1.5rem' }}>Status: {level}</h3>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '15px', lineHeight: 1.6 }}>
-          Your score indicates a {level?.toLowerCase()} level of financial pressure. See our detailed breakdown below.
+          This score represents the level of financial tension detected in your spending patterns. A {level?.toLowerCase()} score indicates a sustainable balance between your income and lifestyle.
         </p>
       </div>
     </div>
@@ -189,19 +189,19 @@ export default function AnalysisPage() {
               </p>
               {risks.length > 0 && (
                 <p>
-                  Your stress is primarily affected by <span className="text-red">{risks.slice(0, 2).join(" and ")}</span>.
+                  Our analysis indicates that your current pressure is largely driven by <span className="text-red">{risks.slice(0, 2).join(" and ")}</span>. 
                   {analysis.snapshot?.overBudgetAmount > 0 && (
-                    <> This includes <strong className="text-red">{fmt(analysis.snapshot.overBudgetAmount)}</strong> spent beyond your planned budget targets.</>
+                    <> Specifically, you've exceeded your planned spending limits by <strong className="text-red">{fmt(analysis.snapshot.overBudgetAmount)}</strong>, which is a primary driver of financial instability.</>
                   )}
                 </p>
               )}
               {positives.length > 0 && (
                 <p>
-                  On the bright side, <span className="text-green">{positives[0]}</span> is helping keep your stress in check.
+                  Conversely, your disciplined management of <span className="text-green">{positives[0]}</span> is providing a significant buffer, preventing your stress levels from rising further.
                 </p>
               )}
               <p>
-                Overall, you are in a <strong>{ml?.ensembleLevel === 'Low' ? 'healthy' : ml?.ensembleLevel === 'Medium' ? 'cautionary' : 'challenging'}</strong> financial position.
+                Conclusion: You are currently maintaining a <strong>{ml?.ensembleLevel === 'Low' ? 'stable and healthy' : ml?.ensembleLevel === 'Medium' ? 'cautious but manageable' : 'critical and high-pressure'}</strong> financial trajectory.
               </p>
             </div>
             <div className="story-hero" style={{ background: 'var(--surface2)', padding: '4rem 2rem' }}>

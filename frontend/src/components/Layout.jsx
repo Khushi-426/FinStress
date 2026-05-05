@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Target,
   FlaskConical,
+  LineChart,
   LogOut,
 } from 'lucide-react';
 
@@ -15,6 +16,7 @@ const NAV = [
   { to: '/tracker', Icon: ClipboardList,   label: 'Daily Tracker' },
   { to: '/budget',  Icon: Target,          label: 'Budget'        },
   { to: '/analyse', Icon: FlaskConical,    label: 'Analysis'      },
+  { to: '/journey', Icon: LineChart,       label: 'Journey'       },
 ];
 
 export default function Layout() {

@@ -9,7 +9,7 @@ router.post('/', auth, async (req, res) => {
   try {
     const { date, category, amount, note, isRecurring, type } = req.body;
     if (!category || amount == null) return res.status(400).json({ error: 'category and amount required' });
-    const exp = await Expense.create({ userId: req.user._id, date: date || Date.now(), category, amount: +amount, note, isRecurring, type: type || 'expense' });
+    const exp = await Expense.create({ userId: req.user._id, date: date || Date.now(), category, amount: Math.round(+amount), note, isRecurring, type: type || 'expense' });
     res.status(201).json(exp);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -53,10 +53,13 @@ router.get('/summary', auth, async (req, res) => {
       } else {
         totalExpenses += total;
       }
-      byCategory[_id.category] = (byCategory[_id.category] || 0) + total;
+      byCategory[_id.category] = Math.round((byCategory[_id.category] || 0) + total);
     });
 
-    res.json({ month, totalIncome, totalExpenses, savingsGap: totalIncome - totalExpenses, byCategory });
+    totalIncome = Math.round(totalIncome);
+    totalExpenses = Math.round(totalExpenses);
+
+    res.json({ month, totalIncome, totalExpenses, savingsGap: Math.round(totalIncome - totalExpenses), byCategory });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -82,7 +85,8 @@ router.patch('/:id', auth, async (req, res) => {
   try {
     const exp = await Expense.findOneAndUpdate(
       { _id: req.params.id, userId: req.user._id },
-      req.body, { new: true }
+      req.body.amount ? { ...req.body, amount: Math.round(+req.body.amount) } : req.body, 
+      { new: true }
     );
     if (!exp) return res.status(404).json({ error: 'Not found' });
     res.json(exp);

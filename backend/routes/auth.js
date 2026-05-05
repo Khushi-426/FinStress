@@ -87,4 +87,13 @@ router.post('/categories', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+router.delete('/categories/:id', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    user.customCategories = user.customCategories.filter(c => c.id !== req.params.id);
+    await user.save();
+    res.json({ user: user.toSafeObject() });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = router;

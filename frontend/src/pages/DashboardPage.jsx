@@ -27,19 +27,22 @@ export default function DashboardPage() {
   const [summary, setSummary] = useState(null);
   const [daily, setDaily] = useState([]);
   const [analyses, setAnalyses] = useState([]);
+  const [budget, setBudget] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [sumR, dayR, anaR] = await Promise.all([
+      const [sumR, dayR, anaR, budR] = await Promise.all([
         api.get(`/expenses/summary?month=${month}`),
         api.get(`/expenses/daily?month=${month}`),
         api.get("/analysis"),
+        api.get(`/budget?month=${month}`),
       ]);
       setSummary(sumR.data || null);
       setDaily(Array.isArray(dayR.data) ? dayR.data : []);
       setAnalyses(Array.isArray(anaR.data) ? anaR.data : []);
+      setBudget(budR.data?._id ? budR.data : null);
     } catch (e) { console.error("Dashboard load error:", e); }
     setLoading(false);
   }, [month]);
@@ -49,9 +52,11 @@ export default function DashboardPage() {
   const latestAnalysis = analyses[0] || null;
   const first = user?.name?.split(" ")[0] || "there";
 
-  const totalIncome   = summary?.totalIncome   || 0;
+  const plannedIn   = (budget?.monthlyIncome || 0) + (budget?.financialAid || 0);
+  const trackedIn   = summary?.totalIncome || 0;
+  const totalIncome = plannedIn + trackedIn;
   const totalExpenses = summary?.totalExpenses  || 0;
-  const savingsGap    = summary?.savingsGap ?? totalIncome - totalExpenses;
+  const savingsGap    = totalIncome - totalExpenses;
   const spendPct      = totalIncome > 0 ? Math.round((totalExpenses / totalIncome) * 100) : 0;
 
   const dailyAccum = (Array.isArray(daily) ? daily : []).reduce((acc, d, i) => {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Pencil, Trash2, Repeat, Inbox, Plus, List, DollarSign } from 'lucide-react';
+import { Pencil, Trash2, Repeat, Inbox, Plus, List, DollarSign, AlertTriangle } from 'lucide-react';
 import api from '../utils/api';
 import MonthNav    from '../components/MonthNav';
 import ExpenseModal from '../components/ExpenseModal';
@@ -85,16 +85,23 @@ export default function TrackerPage() {
     : items.filter(e=>e.category===filter);
 
   const groups = groupByDate(filtered);
-  const totalIn  = summary?.totalIncome   || 0;
+  const plannedIn = (budget?.monthlyIncome || 0) + (budget?.financialAid || 0);
+  const trackedIn = summary?.totalIncome || 0;
+  const totalIn  = plannedIn + trackedIn;
   const totalOut = summary?.totalExpenses || 0;
-  const gap      = summary?.savingsGap ?? totalIn - totalOut;
+  const gap      = totalIn - totalOut;
 
   const expenseCats = getMergedExpenseCats(user?.customCategories || []);
-  const isBudgetComplete = budget && expenseCats.every(c => budget.targets && budget.targets[c.id] !== undefined);
+  // Enforcement: All categories must have a target (can be 0) to be considered "complete"
+  const isBudgetComplete = budget && budget.targets && expenseCats.every(c => (c.id in budget.targets));
 
   const mainInsight = gap < 0 
-    ? `You are running a deficit of ${fmt(Math.abs(gap))}` 
-    : `You have saved ${fmt(gap)} this month`;
+    ? `Deficit Warning: ${fmt(Math.abs(gap))} over your plan` 
+    : `Financial Buffer: ${fmt(gap)} saved`;
+
+  const insightDescription = gap < 0
+    ? `Warning: Your current spending has exceeded your planned income for this month by ${fmt(Math.abs(gap))}. This deficit directly contributes to higher financial stress. We recommend reviewing your high-cost categories to bridge this gap.`
+    : `Good News: You are successfully living within your means. You have a surplus of ${fmt(gap)} which reduces your overall financial tension and builds your resilience for future months.`;
 
   return (
     <div className="fade-up page">
@@ -129,10 +136,9 @@ export default function TrackerPage() {
         </p>
       </div>
 
-      <div className="story-narrative" style={{ textAlign: 'center', marginBottom: '4rem' }}>
+      <div className="story-narrative" style={{ textAlign: 'center', marginBottom: '4rem', maxWidth: '800px', margin: '0 auto 4rem' }}>
         <p>
-          You've recorded <strong className="text-green">{fmt(totalIn)}</strong> in income and <strong className="text-blue">{fmt(totalOut)}</strong> in expenses. 
-          {gap < 0 ? " You might want to review your non-essential spending." : " Great job on maintaining a positive cash flow."}
+          {insightDescription}
         </p>
       </div>
 
@@ -157,17 +163,17 @@ export default function TrackerPage() {
         {loading ? <div className="spin-full"><div className="spin"/></div> : (
           !isBudgetComplete ? (
             <div style={{textAlign:'center',padding:'8rem 0', background: 'var(--surface2)', borderRadius: '32px', border: '2px dashed var(--color-border)'}}>
-              <DollarSign size={64} strokeWidth={1} style={{margin:'0 auto 2rem',color:'var(--color-primary)', opacity: 0.8}}/>
+              <AlertTriangle size={64} strokeWidth={1} style={{margin:'0 auto 2rem',color:'var(--red)', opacity: 0.8}}/>
               <h2 style={{ fontFamily: 'var(--serif)', fontSize: '2.5rem', marginBottom: '1rem' }}>Plan Your Path First.</h2>
-              <p style={{color:'var(--color-text-secondary)',fontSize:18,marginBottom:'3rem', maxWidth: '450px', margin: '0 auto 3rem'}}>
-                To give you the most accurate stress insights, you must fill all categories in your budget goals for {month}.
+              <p style={{color:'var(--color-text-secondary)',fontSize:18,marginBottom:'3rem', maxWidth: '550px', margin: '0 auto 3rem'}}>
+                To provide accurate stress analysis, you must assign a spending target to **every category** in your budget before tracking expenses.
               </p>
               <button 
                 className="btn btn-gradient" 
                 style={{ padding: '16px 48px', fontSize: '18px' }} 
                 onClick={() => window.location.href = '/budget'}
               >
-                Complete Monthly Budget
+                Complete All Budget Targets
               </button>
             </div>
           ) : groups.length === 0 ? (

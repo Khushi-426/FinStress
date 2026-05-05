@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import TrackerPage  from './pages/TrackerPage';
 import BudgetPage   from './pages/BudgetPage';
 import AnalysisPage from './pages/AnalysisPage';
+import JourneyPage from './pages/JourneyPage';
 import './index.css';
 
 const Protected = ({ children }) => {
@@ -30,6 +31,7 @@ export default function App() {
               <Route path="tracker" element={<TrackerPage />} />
               <Route path="budget"  element={<BudgetPage />} />
               <Route path="analyse" element={<AnalysisPage />} />
+              <Route path="journey" element={<JourneyPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

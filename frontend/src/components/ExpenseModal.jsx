@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar } from 'lucide-react';
 import { getMergedCategories } from '../utils/categories';
 import { useAuth } from '../context/AuthContext';
@@ -7,6 +7,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export default function ExpenseModal({ initial, onSave, onClose }) {
   const { user } = useAuth();
+  const dateRef = useRef(null);
   const cats = getMergedCategories(user?.customCategories || []);
   const [form, setForm] = useState({
     date: today(), category: 'food', amount: '',
@@ -85,12 +86,18 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
               <div className="soft-input-wrap">
                 <input 
                   type="date" 
+                  ref={dateRef}
                   className="hide-date-icon"
                   value={form.date} 
                   onChange={set('date')} 
                   max={today()} 
                 />
-                <Calendar size={16} className="soft-input-icon" />
+                <Calendar 
+                  size={16} 
+                  className="soft-input-icon" 
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => dateRef.current?.showPicker()}
+                />
               </div>
             </div>
           </div>

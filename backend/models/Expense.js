@@ -5,8 +5,6 @@ const expenseSchema = new mongoose.Schema({
   date:     { type: Date, required: true, default: Date.now },
   category: {
     type: String, required: true,
-    enum: ['housing','food','transportation','books_supplies','entertainment',
-           'personal_care','technology','health_wellness','miscellaneous','tuition','income','financial_aid'],
   },
   amount:   { type: Number, required: true },
   // positive = expense, negative not used; income/aid stored as separate category type
