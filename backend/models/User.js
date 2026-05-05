@@ -4,7 +4,7 @@ const bcrypt   = require('bcryptjs');
 const userSchema = new mongoose.Schema({
   name:         { type: String, required: true, trim: true },
   email:        { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password:     { type: String, required: true, minlength: 6 },
+  password:     { type: String, required: true, minlength: 8 },
   age:          { type: Number, min: 13, max: 35 },
   gender:       { type: String, enum: ['Male', 'Female', 'Non-binary'] },
   yearInSchool: { type: String, enum: ['Freshman', 'Sophomore', 'Junior', 'Senior'] },
@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
     color: { type: String, default: '#90a4ae' },
     type:  { type: String, default: 'expense' }
   }],
+  hiddenCategories: [{ type: String }],
   createdAt:    { type: Date, default: Date.now },
 });
 

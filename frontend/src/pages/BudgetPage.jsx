@@ -72,7 +72,8 @@ export default function BudgetPage() {
     setTimeout(() => setSaved(false), 2500);
   };
 
-  const expenseCats = getMergedExpenseCats(user?.customCategories || []);
+  const expenseCats = getMergedExpenseCats(user?.customCategories || [])
+    .filter(c => !(user?.hiddenCategories || []).includes(c.id));
 
   const totalBudget   = Object.values(targets).reduce((s,v)=>s+(+v||0),0);
   const totalActual   = summary?.totalExpenses || 0;
@@ -143,9 +144,21 @@ export default function BudgetPage() {
                   Assign your limits for each category. We'll compare your actual spending against these targets in real-time.
                 </p>
               </div>
-              <button className="btn btn-ghost" onClick={() => setShowAdd(!showAdd)}>
-                <Plus size={16} /> Add Custom Category
-              </button>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                {(user?.hiddenCategories?.length > 0) && (
+                  <button className="btn btn-ghost" onClick={async () => {
+                    for (const catId of user.hiddenCategories) {
+                      await api.post('/auth/categories/restore', { catId });
+                    }
+                    await refresh();
+                  }}>
+                    Restore Hidden
+                  </button>
+                )}
+                <button className="btn btn-ghost" onClick={() => setShowAdd(!showAdd)}>
+                  <Plus size={16} /> Add Custom Category
+                </button>
+              </div>
             </div>
 
             {showAdd && (
@@ -183,16 +196,17 @@ export default function BudgetPage() {
                         <span style={{fontSize:32}}>{cat.icon}</span>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                            <span style={{fontSize:18,fontWeight:600}}>{cat.label}</span>
-                            {user?.customCategories?.find(cc => cc.id === cat.id) && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span style={{fontSize:18,fontWeight:600}}>{cat.label}</span>
                               <button 
                                 className="btn btn-xs btn-ghost" 
-                                style={{ color: 'var(--red)', border: 'none', padding: '4px' }}
+                                style={{ color: 'var(--red)', border: 'none', padding: '4px', opacity: 0.4 }}
                                 onClick={() => deleteCategory(cat.id)}
+                                title="Remove category from budget"
                               >
                                 <Trash2 size={14} />
                               </button>
-                            )}
+                            </div>
                             {actual > 0 && (
                               <span style={{ fontSize: 14, color: over ? 'var(--red)' : 'var(--color-text-secondary)', fontWeight: 600 }}>
                                 {fmt(actual)} spent

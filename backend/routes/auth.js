@@ -11,15 +11,24 @@ const router = express.Router();
 const sign   = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '7d' });
 
 router.post('/register', [
-  body('name').trim().notEmpty(),
-  body('email').isEmail(),
-  body('password').isLength({ min: 6 }),
+  body('name').trim().notEmpty().withMessage('Name is required'),
+  body('email').isEmail().withMessage('Please provide a valid email address'),
+  body('password')
+    .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long')
+    .matches(/[A-Z]/).withMessage('Password must contain at least one uppercase letter')
+    .matches(/[a-z]/).withMessage('Password must contain at least one lowercase letter')
+    .matches(/[0-9]/).withMessage('Password must contain at least one digit')
+    .matches(/[!@#$%^&*]/).withMessage('Password must contain at least one special character'),
 ], async (req, res) => {
   const errs = validationResult(req);
-  if (!errs.isEmpty()) return res.status(400).json({ errors: errs.array() });
+  if (!errs.isEmpty()) {
+    return res.status(400).json({ error: errs.array()[0].msg });
+  }
   try {
     if (await User.findOne({ email: req.body.email })) return res.status(400).json({ error: 'Email already registered' });
-    const user  = await User.create(req.body);
+    
+    // Hashing is handled in User model pre-save hook using bcryptjs
+    const user = await User.create(req.body);
     res.status(201).json({ token: sign(user._id), user: user.toSafeObject() });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -90,7 +99,29 @@ router.post('/categories', auth, async (req, res) => {
 router.delete('/categories/:id', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-    user.customCategories = user.customCategories.filter(c => c.id !== req.params.id);
+    const catId = req.params.id;
+    
+    // If it's a custom category, remove it
+    const isCustom = user.customCategories.some(c => c.id === catId);
+    if (isCustom) {
+      user.customCategories = user.customCategories.filter(c => c.id !== catId);
+    } else {
+      // If it's a default category, hide it
+      if (!user.hiddenCategories.includes(catId)) {
+        user.hiddenCategories.push(catId);
+      }
+    }
+    
+    await user.save();
+    res.json({ user: user.toSafeObject() });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+router.post('/categories/restore', auth, async (req, res) => {
+  try {
+    const { catId } = req.body;
+    const user = await User.findById(req.user._id);
+    user.hiddenCategories = user.hiddenCategories.filter(id => id !== catId);
     await user.save();
     res.json({ user: user.toSafeObject() });
   } catch (err) { res.status(500).json({ error: err.message }); }

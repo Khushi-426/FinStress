@@ -11,10 +11,43 @@ export default function RegisterPage() {
   const [busy, setBusy] = useState(false);
   const set = k => e => setF(p=>({...p,[k]:e.target.value}));
 
+  const validate = () => {
+    // Email regex
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(f.email)) return 'Please enter a valid email address';
+
+    // Password strength: min 8, uppercase, lowercase, digit, special char
+    const passRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*])[A-Za-z\d!@#$%^&*]{8,}$/;
+    if (!passRegex.test(f.password)) {
+      return 'Password must be at least 8 chars, with uppercase, lowercase, number, and special character (!@#$%^&*)';
+    }
+
+    if (!f.name.trim()) return 'Name is required';
+    if (!f.age) return 'Age is required';
+    
+    return null;
+  };
+
   const submit = async e => {
-    e.preventDefault(); setErr(''); setBusy(true);
-    try { await register(f); navigate('/'); }
-    catch(e){ setErr(e.message); } finally { setBusy(false); }
+    e.preventDefault(); 
+    setErr(''); 
+
+    const error = validate();
+    if (error) {
+      setErr(error);
+      return;
+    }
+
+    setBusy(true);
+    try { 
+      await register(f); 
+      navigate('/'); 
+    }
+    catch(e){ 
+      setErr(e.response?.data?.error || e.message); 
+    } finally { 
+      setBusy(false); 
+    }
   };
 
   return (
@@ -37,7 +70,7 @@ export default function RegisterPage() {
             </div>
             <div className="fg">
               <label>Password</label>
-              <input type="password" value={f.password} onChange={set('password')} placeholder="Min 6 chars" required/>
+              <input type="password" value={f.password} onChange={set('password')} placeholder="8+ chars, upper, lower, #, @" required/>
             </div>
             <div className="fg">
               <label>Age</label>

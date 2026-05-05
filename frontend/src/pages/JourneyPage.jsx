@@ -121,38 +121,113 @@ export default function JourneyPage() {
 
           <section style={{ marginBottom: '6rem' }}>
             <h2 className="section-title" style={{ textAlign: 'left', marginBottom: '3rem' }}>Milestones</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '2rem' }}>
-              {history.slice().reverse().map((h, i) => (
-                <div key={h.month} className="highlight-panel fade-in" style={{ animationDelay: `${i * 0.1}s`, padding: '2rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
-                    <div>
-                      <h4 style={{ fontWeight: 700, marginBottom: '4px' }}>{monthLabel(h.month)}</h4>
-                      <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>Monthly Milestone</span>
-                    </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '2.5rem' }}>
+              {history.slice().reverse().map((h, i) => {
+                const [y, m] = h.month.split('-');
+                const monthIdx = parseInt(m) - 1;
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                const monthColor = [
+                  '#8faeff', '#a4c2ff', '#6fcf97', '#f2c94c', '#e57373', '#9baef5',
+                  '#8faeff', '#a4c2ff', '#6fcf97', '#f2c94c', '#e57373', '#9baef5'
+                ][monthIdx];
+                const isLatest = i === 0;
+
+                return (
+                  <div 
+                    key={h.month} 
+                    className="highlight-panel fade-in" 
+                    style={{ 
+                      animationDelay: `${i * 0.1}s`, 
+                      padding: '2.5rem',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      borderTop: `4px solid ${monthColor}`,
+                      background: isLatest ? 'var(--color-surface)' : 'var(--color-surface)',
+                      boxShadow: isLatest ? 'var(--shadow-lg)' : 'var(--shadow-md)',
+                      transform: isLatest ? 'scale(1.02)' : 'none',
+                      zIndex: isLatest ? 2 : 1
+                    }}
+                  >
+                    {/* Background identifier */}
                     <div style={{ 
-                      background: h.ml.ensembleLevel === 'Low' ? 'var(--green)' : h.ml.ensembleLevel === 'Medium' ? 'var(--amber)' : 'var(--red)',
-                      color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '10px', fontWeight: 800
+                      position: 'absolute', 
+                      right: '-10px', 
+                      bottom: '-20px', 
+                      fontSize: '8rem', 
+                      fontWeight: 900, 
+                      color: 'var(--color-secondary)', 
+                      opacity: 0.3,
+                      userSelect: 'none',
+                      pointerEvents: 'none',
+                      lineHeight: 1,
+                      fontFamily: 'var(--serif)'
                     }}>
-                      {h.ml.ensembleLevel.toUpperCase()}
+                      {m}
                     </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '2rem', marginBottom: '1.5rem' }}>
-                    <div>
-                      <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Score</div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{Math.round(h.ml.ensembleScore)}</div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', textTransform: 'uppercase' }}>Gap</div>
-                      <div style={{ fontSize: '1.5rem', fontWeight: 700, color: h.snapshot.savingsGap >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                        {h.snapshot.savingsGap >= 0 ? '+' : ''}{Math.round(h.snapshot.savingsGap / 1000)}k
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem', position: 'relative', zIndex: 1 }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <h4 style={{ fontWeight: 700, fontSize: '1.2rem' }}>{monthLabel(h.month)}</h4>
+                          {isLatest && (
+                            <span style={{ 
+                              fontSize: '9px', 
+                              background: 'var(--color-primary)', 
+                              color: 'white', 
+                              padding: '2px 8px', 
+                              borderRadius: '4px',
+                              fontWeight: 700,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.5px'
+                            }}>Latest</span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', fontWeight: 500 }}>Monthly Snapshot</span>
+                      </div>
+                      <div style={{ 
+                        background: h.ml.ensembleLevel === 'Low' ? 'var(--green)' : h.ml.ensembleLevel === 'Medium' ? 'var(--amber)' : 'var(--red)',
+                        color: 'white', padding: '6px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: 800,
+                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                      }}>
+                        {h.ml.ensembleLevel.toUpperCase()}
                       </div>
                     </div>
+
+                    <div style={{ display: 'flex', gap: '3rem', marginBottom: '2rem', position: 'relative', zIndex: 1 }}>
+                      <div>
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>Score</div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--color-text-primary)' }}>{Math.round(h.ml.ensembleScore)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '1px', marginBottom: '4px' }}>Gap</div>
+                        <div style={{ fontSize: '2rem', fontWeight: 700, color: h.snapshot.savingsGap >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                          {h.snapshot.savingsGap >= 0 ? '+' : ''}{Math.round(h.snapshot.savingsGap / 1000)}k
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      className="btn btn-ghost" 
+                      style={{ 
+                        padding: '10px 0', 
+                        fontSize: '13px', 
+                        fontWeight: 600, 
+                        border: 'none', 
+                        background: 'none',
+                        color: 'var(--color-primary-dark)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        position: 'relative',
+                        zIndex: 1
+                      }} 
+                      onClick={() => navigate('/analyse', { state: { month: h.month } })}
+                    >
+                      Review full details <span style={{ transition: 'transform 0.2s' }}>→</span>
+                    </button>
                   </div>
-                  <button className="btn btn-ghost" style={{ padding: '8px 0', fontSize: '13px' }} onClick={() => navigate('/analyse', { state: { month: h.month } })}>
-                    Review Details →
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
 
