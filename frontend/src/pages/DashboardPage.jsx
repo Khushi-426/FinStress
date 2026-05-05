@@ -153,7 +153,7 @@ export default function DashboardPage() {
               <div className="story-narrative">
                 <p>
                   Your daily expenses fluctuate, with some days showing higher activity than others. 
-                  Average daily spend is around <strong>{fmt(Math.round(totalExpenses / 30))}</strong>.
+                  Average daily spend is around <strong>{fmt(totalExpenses / 30)}</strong>.
                 </p>
                 <p>
                   Consistent tracking allows us to predict potential stress points before they happen.

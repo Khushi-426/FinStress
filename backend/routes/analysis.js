@@ -45,8 +45,8 @@ function buildSuggestions(snap, ml, user) {
         category: cat,
         severity: 'danger',
         title: `Over Budget: ${displayCat}`,
-        text: `You exceeded your ${displayCat} target by ₹${Math.round(diff)}. To lower your stress, try capping this category next month.`,
-        potential: Math.round(diff),
+        text: `You exceeded your ${displayCat} target by ₹${diff.toLocaleString('en-IN', { maximumFractionDigits: 2 })}. To lower your stress, try capping this category next month.`,
+        potential: Math.round(diff * 100) / 100,
         impact: 'High'
       });
     }
@@ -54,12 +54,12 @@ function buildSuggestions(snap, ml, user) {
 
   // 2. High Discretionary Spend
   if (discretionaryRatio > 0.3) {
-    const waste = Math.round((discretionaryRatio - 0.2) * (totalIncome || 1));
+    const waste = Math.round((discretionaryRatio - 0.2) * (totalIncome || 1) * 100) / 100;
     sugs.push({
       category: 'discretionary',
       severity: 'warn',
       title: 'High Non-Essential Spending',
-      text: `${Math.round(discretionaryRatio * 100)}% of your income goes to non-essentials. Reducing this to 20% would save you approx ₹${waste} and significantly lower your stress score.`,
+      text: `${Math.round(discretionaryRatio * 100)}% of your income goes to non-essentials. Reducing this to 20% would save you approx ₹${waste.toLocaleString('en-IN', { maximumFractionDigits: 2 })} and significantly lower your stress score.`,
       potential: waste,
       impact: 'Medium'
     });
@@ -71,8 +71,8 @@ function buildSuggestions(snap, ml, user) {
       category: 'food',
       severity: 'warn',
       title: 'Optimization: Food & Dining',
-      text: `Your food spending (₹${Math.round(byCategory.food)}) is above the typical student average. Meal prepping just 3 days a week can reduce dining costs by up to 30%.`,
-      potential: Math.round(byCategory.food * 0.3),
+      text: `Your food spending (₹${byCategory.food.toLocaleString('en-IN', { maximumFractionDigits: 2 })}) is above the typical student average. Meal prepping just 3 days a week can reduce dining costs by up to 30%.`,
+      potential: Math.round(byCategory.food * 0.3 * 100) / 100,
       impact: 'Medium'
     });
   }
@@ -82,8 +82,8 @@ function buildSuggestions(snap, ml, user) {
       category: 'transportation',
       severity: 'warn',
       title: 'Commute Efficiency',
-      text: `Transportation costs are high. Consider student transit passes or carpooling to save roughly ₹${Math.round(byCategory.transportation * 0.2)} monthly.`,
-      potential: Math.round(byCategory.transportation * 0.2),
+      text: `Transportation costs are high. Consider student transit passes or carpooling to save roughly ₹${(byCategory.transportation * 0.2).toLocaleString('en-IN', { maximumFractionDigits: 2 })} monthly.`,
+      potential: Math.round(byCategory.transportation * 0.2 * 100) / 100,
       impact: 'Low'
     });
   }
@@ -105,8 +105,8 @@ function buildSuggestions(snap, ml, user) {
       category: 'budget',
       severity: 'danger',
       title: 'Critical: Living Above Means',
-      text: `You are running a ₹${Math.abs(Math.round(savingsGap))} deficit. This is a major stress driver. We recommend a "no-spend" week on non-essentials to bridge this gap immediately.`,
-      potential: Math.abs(Math.round(savingsGap)),
+      text: `You are running a ₹${Math.abs(savingsGap).toLocaleString('en-IN', { maximumFractionDigits: 2 })} deficit. This is a major stress driver. We recommend a "no-spend" week on non-essentials to bridge this gap immediately.`,
+      potential: Math.abs(Math.round(savingsGap * 100) / 100),
       impact: 'Critical'
     });
   } else if (savingsGap > 5000 && ml.ensembleScore < 40) {
@@ -114,7 +114,7 @@ function buildSuggestions(snap, ml, user) {
       category: 'savings',
       severity: 'good',
       title: 'Resilience Strategy: Surplus detected',
-      text: `Great work! You have a ₹${Math.round(savingsGap)} surplus. Move ₹${Math.round(savingsGap * 0.4)} to an emergency fund to build long-term financial resilience.`,
+      text: `Great work! You have a ₹${savingsGap.toLocaleString('en-IN', { maximumFractionDigits: 2 })} surplus. Move ₹${(savingsGap * 0.4).toLocaleString('en-IN', { maximumFractionDigits: 2 })} to an emergency fund to build long-term financial resilience.`,
       potential: 0,
       impact: 'High'
     });
@@ -146,9 +146,6 @@ router.post('/run', auth, async (req, res) => {
     const user   = req.user;
     logger.info('Analysis run started', { userId: user._id, month });
 
-    const session = await Expense.startSession();
-    session.startTransaction();
-
     try {
       // Optimized single aggregation pipeline
       const agg = await Expense.aggregate([
@@ -163,7 +160,7 @@ router.post('/run', auth, async (req, res) => {
             ]
           }
         }
-      ]).session(session);
+      ]);
 
       const facets = agg[0];
       const byCategory = {};
@@ -178,7 +175,7 @@ router.post('/run', auth, async (req, res) => {
       if (byCategory.financial_aid) totalIncome += (byCategory.financial_aid || 0);
 
       // Pull budget for targets and fallback income
-      const budget = await Budget.findOne({ userId: user._id, month }).session(session);
+      const budget = await Budget.findOne({ userId: user._id, month });
       let targets = budget?.targets || {};
 
       // DEFENSIVE: Ensure targets is an object and initialized
@@ -308,6 +305,19 @@ router.post('/run', auth, async (req, res) => {
         }
       }
 
+      const cleanName = (n) => {
+        const map = {
+          'gender_enc': 'Demographic factors',
+          'age': 'Age profile',
+          'year_enc': 'Academic year',
+          'major_enc': 'Course requirements',
+          'payment_enc': 'Payment habits',
+          'expense_ratio': 'Total spending vs Income',
+          'monthly_income': 'Income level',
+        };
+        return map[n] || n.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      };
+
       const ml = {
         ftStressScore:  mlResult.ft.stress_score,
         ftStressLevel:  mlResult.ft.stress_level,
@@ -318,10 +328,10 @@ router.post('/run', auth, async (req, res) => {
         xgbProbHigh:    mlResult.xgb.prob_high,
         ensembleScore:  mlResult.ensemble.stress_score,
         ensembleLevel:  mlResult.ensemble.stress_level,
-        shapValues:     mlResult.shap.values,
+        shapValues:     (mlResult.shap.values || []).map(v => ({ ...v, display_name: cleanName(v.display_name) })),
         shapBaseValue:  mlResult.shap.base_value,
-        topRiskFactors: mlResult.shap.top_risk,
-        topPositiveFactors: mlResult.shap.top_positive,
+        topRiskFactors: (mlResult.shap.top_risk || []).map(cleanName),
+        topPositiveFactors: (mlResult.shap.top_positive || []).map(cleanName),
       };
 
       const suggestions = buildSuggestions(snapshot, ml, user);
@@ -335,22 +345,18 @@ router.post('/run', auth, async (req, res) => {
           ml_fallback_used: mlFallbackUsed,
           fallback_timestamp: mlFallbackUsed ? new Date() : null
         },
-        { upsert: true, new: true, session }
+        { upsert: true, new: true }
       );
 
-      await session.commitTransaction();
       logger.info('Analysis completed successfully', { userId: user._id, month, analysisId: analysis._id });
       res.json({ analysisId: analysis._id, month, snapshot, ml, suggestions });
     } catch (err) {
-      await session.abortTransaction();
       if (err.code === 11000) {
         // Handle race condition: if duplicate created during transaction, fetch existing
         const existing = await Analysis.findOne({ userId: user._id, month });
         if (existing) return res.json(existing);
       }
       throw err;
-    } finally {
-      session.endSession();
     }
   } catch (err) {
     logger.error('Analysis failed', { userId: req.user?._id, month: req.body?.month, error: err.message });

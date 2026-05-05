@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Target, Plus, Trash2, TrendingUp, Calendar } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { Target, Plus, Trash2, TrendingUp, Calendar, X } from 'lucide-react';
 import api from '../utils/api';
 import LoadingState from '../components/LoadingState';
 import { fmt } from '../utils/categories';
@@ -106,9 +107,16 @@ export default function SavingsPage() {
         </div>
       )}
 
-      {showModal && (
+      {showModal && ReactDOM.createPortal(
         <div className="modal-back" onClick={() => setShowModal(false)}>
           <div className="modal-box glow-in" style={{ maxWidth: '480px' }} onClick={e => e.stopPropagation()}>
+            <button 
+              onClick={() => setShowModal(false)}
+              style={{ position: 'absolute', top: '2rem', right: '2rem', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', zIndex: 10 }}
+            >
+              <X size={20} />
+            </button>
+
             <h2 style={{ fontFamily: 'var(--serif)', fontSize: '2.2rem', marginBottom: '2.5rem', textAlign: 'center' }}>Set a Goal</h2>
             <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
               <div className="fg">
@@ -132,8 +140,12 @@ export default function SavingsPage() {
                     type="number" 
                     required 
                     value={newGoal.targetAmount} 
-                    onChange={e => setNewGoal({...newGoal, targetAmount: e.target.value})} 
+                    onChange={e => {
+                      const v = parseFloat(e.target.value);
+                      setNewGoal({...newGoal, targetAmount: v >= 0 ? v : 0});
+                    }} 
                     placeholder="0.00" 
+                    min="0"
                   />
                 </div>
               </div>
@@ -157,7 +169,8 @@ export default function SavingsPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -139,20 +139,24 @@ router.get('/summary', auth, async (req, res) => {
     const previous = process(prevAgg);
 
     const comparison = {};
-    Object.keys(current.cats).forEach(cat => {
-      const cur = current.cats[cat];
+    const allCats = new Set([...Object.keys(current.cats), ...Object.keys(previous.cats)]);
+    allCats.forEach(cat => {
+      const cur = current.cats[cat] || 0;
       const prev = previous.cats[cat] || 0;
-      comparison[cat] = prev === 0 ? 100 : Math.round(((cur - prev) / prev) * 100);
+      if (prev === 0 && cur > 0) comparison[cat] = 100;
+      else if (prev > 0 && cur === 0) comparison[cat] = -100;
+      else if (prev > 0) comparison[cat] = Math.round(((cur - prev) / prev) * 100);
+      else comparison[cat] = 0;
     });
 
     const result = { 
       month: mStr,
-      totalIncome: Math.round(current.inc),
-      totalExpenses: Math.round(current.exp),
-      savingsGap: Math.round(current.inc - current.exp),
+      totalIncome: current.inc,
+      totalExpenses: current.exp,
+      savingsGap: current.inc - current.exp,
       byCategory: current.cats,
       comparison,
-      prevTotals: { income: Math.round(previous.inc), expenses: Math.round(previous.exp) }
+      prevTotals: { income: previous.inc, expenses: previous.exp }
     };
     
     cache.set(cacheKey, result);
@@ -180,6 +184,9 @@ router.get('/daily', auth, async (req, res) => {
 // PATCH /api/expenses/:id
 router.patch('/:id', auth, async (req, res) => {
   try {
+    if (req.body.amount && (isNaN(req.body.amount) || +req.body.amount <= 0)) {
+      return res.status(400).json({ error: 'Amount must be a positive number' });
+    }
     const exp = await Expense.findOneAndUpdate(
       { _id: req.params.id, userId: req.user._id },
       req.body.amount ? { ...req.body, amount: Math.round(+req.body.amount * 100) / 100 } : req.body, 

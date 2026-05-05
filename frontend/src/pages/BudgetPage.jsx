@@ -36,7 +36,10 @@ export default function BudgetPage() {
 
   useEffect(() => { load(); setSaved(false); }, [load]);
 
-  const set = k => e => setTargets(t => ({ ...t, [k]: +e.target.value || 0 }));
+  const set = k => e => {
+    const val = parseFloat(e.target.value);
+    setTargets(t => ({ ...t, [k]: val >= 0 ? val : 0 }));
+  };
 
   const addCategory = async () => {
     if (!newCat.label) return;
@@ -120,14 +123,20 @@ export default function BudgetPage() {
                   <label>Monthly Income</label>
                   <div className="soft-input-wrap">
                     <span className="soft-input-prefix">₹</span>
-                    <input type="number" value={income} onChange={e=>setIncome(e.target.value)} placeholder="0" min="0" />
+                    <input type="number" value={income} onChange={e=>{
+                      const v = parseFloat(e.target.value);
+                      setIncome(v >= 0 ? v : 0);
+                    }} placeholder="0" min="0" />
                   </div>
                 </div>
                 <div className="fg">
                   <label>Financial Aid</label>
                   <div className="soft-input-wrap">
                     <span className="soft-input-prefix">₹</span>
-                    <input type="number" value={aid} onChange={e=>setAid(e.target.value)} placeholder="0" min="0" />
+                    <input type="number" value={aid} onChange={e=>{
+                      const v = parseFloat(e.target.value);
+                      setAid(v >= 0 ? v : 0);
+                    }} placeholder="0" min="0" />
                   </div>
                 </div>
               </div>
@@ -184,7 +193,7 @@ export default function BudgetPage() {
             <div style={{display:'flex',flexDirection:'column',gap:'3.5rem'}}>
               {expenseCats.map(cat => {
                 const target = targets[cat.id] || 0;
-                const actual = Math.round(summary?.byCategory?.[cat.id] || 0);
+                const actual = summary?.byCategory?.[cat.id] || 0;
                 const over   = target > 0 && actual > target;
                 const pct    = target > 0 ? Math.min(actual / target, 1.5) : 0;
                 const barColor = over ? 'var(--red)' : pct > 0.8 ? 'var(--amber)' : cat.color;

@@ -37,7 +37,7 @@ export const getMergedExpenseCats = (custom = []) => {
   return getMergedCategories(custom).filter(c => c.type === 'expense');
 };
 
-export const fmt  = (n) => '₹' + Math.abs(Math.round(n)).toLocaleString('en-IN');
+export const fmt  = (n) => '₹' + Math.abs(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 export const fmtSigned = (n) => (n >= 0 ? '+' : '-') + fmt(n);
 export const pct  = (n) => Math.round(n * 10) / 10 + '%';
 

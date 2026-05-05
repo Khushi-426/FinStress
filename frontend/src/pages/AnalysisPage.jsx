@@ -181,7 +181,7 @@ export default function AnalysisPage() {
             </p>
           </div>
 
-          <div className="story-split" style={{ alignItems: 'flex-start' }}>
+          <div className="story-split" style={{ alignItems: 'center' }}>
             <div className="story-narrative">
               <h2 className="section-title" style={{ textAlign: 'left', marginBottom: '2rem' }}>The Breakdown</h2>
               <p>
@@ -224,7 +224,7 @@ export default function AnalysisPage() {
                 Conclusion: You are currently maintaining a <strong>{ml?.ensembleLevel === 'Low' ? 'stable and healthy' : ml?.ensembleLevel === 'Medium' ? 'cautious but manageable' : 'critical and high-pressure'}</strong> financial trajectory.
               </p>
             </div>
-            <div className="story-hero" style={{ background: 'var(--surface2)', padding: '4rem 2rem' }}>
+            <div className="story-hero" style={{ background: 'var(--surface2)', padding: '5rem 3rem' }}>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '1rem' }}>Stress Score</div>
                 <div style={{ fontFamily: 'var(--serif)', fontSize: '5rem', color: 'var(--color-primary-dark)', lineHeight: 1 }}>

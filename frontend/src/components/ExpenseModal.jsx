@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Calendar } from 'lucide-react';
 import { getMergedCategories } from '../utils/categories';
 import { useAuth } from '../context/AuthContext';
@@ -30,7 +31,9 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
 
   const set = k => e => {
     setIsDirty(true);
-    setForm(f => ({ ...f, [k]: e.target.value }));
+    let val = e.target.value;
+    if (k === 'amount' && val < 0) val = 0;
+    setForm(f => ({ ...f, [k]: val }));
   };
 
   useEffect(() => {
@@ -58,12 +61,12 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
 
   const currentCat = cats.find(c => c.id === form.category);
 
-  return (
+  return ReactDOM.createPortal(
     <div className="modal-back" onClick={e => e.target===e.currentTarget && handleClose()}>
-      <div className="modal-box glow-in" style={{ position: 'relative' }}>
+      <div className="modal-box glow-in">
         <button 
           onClick={handleClose}
-          style={{ position: 'absolute', top: '2rem', right: '2rem', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
+          style={{ position: 'absolute', top: '2rem', right: '2rem', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', zIndex: 10 }}
         >
           <X size={20} />
         </button>
@@ -171,7 +174,8 @@ export default function ExpenseModal({ initial, onSave, onClose }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
