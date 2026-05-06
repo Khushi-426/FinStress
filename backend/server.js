@@ -72,7 +72,7 @@ app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/expenses', require('./routes/expenses'));
 app.use('/api/budget',   require('./routes/budget'));
 app.use('/api/analysis', require('./routes/analysis'));
-app.use('/api/savings',  require('./routes/savings'));
+
 
 app.get('/api/health', (_, res) => res.json({ status: 'ok', timestamp: new Date() }));
 

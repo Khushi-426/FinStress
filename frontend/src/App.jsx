@@ -11,7 +11,7 @@ const TrackerPage  = lazy(() => import('./pages/TrackerPage'));
 const BudgetPage   = lazy(() => import('./pages/BudgetPage'));
 const AnalysisPage = lazy(() => import('./pages/AnalysisPage'));
 const JourneyPage = lazy(() => import('./pages/JourneyPage'));
-const SavingsPage = lazy(() => import('./pages/SavingsPage'));
+
 import './index.css';
 
 const Protected = ({ children }) => {
@@ -35,7 +35,7 @@ export default function App() {
                 <Route path="budget"  element={<BudgetPage />} />
                 <Route path="analyse" element={<AnalysisPage />} />
                 <Route path="journey" element={<JourneyPage />} />
-                <Route path="savings" element={<SavingsPage />} />
+
               </Route>
             </Routes>
           </Suspense>

@@ -17,7 +17,7 @@ const NAV = [
   { to: '/tracker', Icon: ClipboardList,   label: 'Daily Tracker' },
   { to: '/budget',  Icon: Target,          label: 'Budget'        },
   { to: '/analyse', Icon: FlaskConical,    label: 'Analysis'      },
-  { to: '/savings', Icon: Wallet,          label: 'Savings'       },
+
   { to: '/journey', Icon: LineChart,       label: 'Journey'       },
 ];
 
