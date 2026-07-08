@@ -21,6 +21,7 @@
 - [Setup & Installation](#setup--installation)
 - [Environment Variables](#environment-variables)
 - [Pages & Features](#pages--features)
+- [Testing & Validation](#testing--validation)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -33,12 +34,12 @@ FinStress v2 is a full-stack web application for college students to track daily
 
 ### Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 18, Recharts, React Router v6 |
-| Backend API | Node.js 20, Express 4, Mongoose, JWT |
-| Database | MongoDB 7 |
-| ML Service | Python 3.11, FastAPI, PyTorch, XGBoost, SHAP |
+| Layer       | Technology                                   |
+| ----------- | -------------------------------------------- |
+| Frontend    | React 18, Recharts, React Router v6          |
+| Backend API | Node.js 20, Express 4, Mongoose, JWT         |
+| Database    | MongoDB 7                                    |
+| ML Service  | Python 3.11, FastAPI, PyTorch, XGBoost, SHAP |
 
 ---
 
@@ -107,31 +108,31 @@ Log expenses daily   →   Set monthly budget   →   Click "Run Analysis"   →
 
 A pure PyTorch implementation of the Feature Tokenisation Transformer from [Revisiting Deep Learning Models for Tabular Data](https://arxiv.org/abs/2106.11959) (Gorishniy et al., 2021).
 
-| Hyperparameter | Value |
-|---|---|
-| `d_token` | 192 — embedding dimension per feature |
-| `n_heads` | 8 attention heads |
-| `n_layers` | 3 transformer blocks |
-| `dropout` | 0.1 |
-| `ffn_factor` | 4/3 |
-| Optimizer | AdamW, lr=3e-4, weight_decay=1e-4 |
-| Scheduler | CosineAnnealingLR |
-| Loss | MSELoss on stress score 0–100 |
-| Early stopping | patience=15 on validation loss |
+| Hyperparameter | Value                                 |
+| -------------- | ------------------------------------- |
+| `d_token`      | 192 — embedding dimension per feature |
+| `n_heads`      | 8 attention heads                     |
+| `n_layers`     | 3 transformer blocks                  |
+| `dropout`      | 0.1                                   |
+| `ffn_factor`   | 4/3                                   |
+| Optimizer      | AdamW, lr=3e-4, weight_decay=1e-4     |
+| Scheduler      | CosineAnnealingLR                     |
+| Loss           | MSELoss on stress score 0–100         |
+| Early stopping | patience=15 on validation loss        |
 
 **Architecture:** Numerical embedding (linear projection per feature) → prepend `[CLS]` token → 3× TransformerBlock → LayerNorm on CLS output → MLP head → Sigmoid × 100
 
 ### XGBoost Regressor
 
-| Hyperparameter | Value |
-|---|---|
-| `n_estimators` | 500 with early stopping |
-| `max_depth` | 6 |
-| `learning_rate` | 0.05 |
-| `subsample` | 0.8 |
-| `colsample_bytree` | 0.8 |
-| `reg_alpha / lambda` | 0.1 / 1.0 |
-| `eval_metric` | MAE, `early_stopping_rounds=30` |
+| Hyperparameter       | Value                           |
+| -------------------- | ------------------------------- |
+| `n_estimators`       | 500 with early stopping         |
+| `max_depth`          | 6                               |
+| `learning_rate`      | 0.05                            |
+| `subsample`          | 0.8                             |
+| `colsample_bytree`   | 0.8                             |
+| `reg_alpha / lambda` | 0.1 / 1.0                       |
+| `eval_metric`        | MAE, `early_stopping_rounds=30` |
 
 ### Ensemble
 
@@ -162,11 +163,11 @@ stress_score = clamp( (expense_ratio − 0.3) / 1.7 × 100,  0,  100 )
 
 Where `expense_ratio = total_expenses / total_income`
 
-| Score | Level |
-|---|---|
-| 0 – 33 | 🟢 Low |
-| 33 – 66 | 🟡 Medium |
-| 66 – 100 | 🔴 High |
+| Score    | Level     |
+| -------- | --------- |
+| 0 – 33   | 🟢 Low    |
+| 33 – 66  | 🟡 Medium |
+| 66 – 100 | 🔴 High   |
 
 ---
 
@@ -239,36 +240,57 @@ finstress2/
 
 ---
 
+## Testing & Validation
+
+The application was validated locally on 2026-07-08 with a mix of build, smoke, and lightweight load checks.
+
+### What was tested
+
+- Frontend production build: `npm run build` completed successfully in the frontend app.
+- Frontend smoke test: the local React app served the home page successfully at `http://localhost:3000` with HTTP 200.
+- Backend smoke test: the health endpoint responded successfully at `http://localhost:5000/api/health` with HTTP 200 and a JSON payload.
+- Authentication smoke test: a registration request was exercised against `/api/auth/register`; it currently returns HTTP 500, which indicates a backend issue that still needs follow-up.
+- Load smoke test: 10 concurrent requests were sent to the health endpoint and all completed successfully with 0 failures.
+
+### User/load coverage
+
+- Tested against 10 concurrent users / requests during the load smoke test.
+- No failures were observed in that load check.
+
+> Note: the current validation confirms the app boots and serves core pages, but the auth registration flow still needs debugging.
+
+---
+
 ## API Reference
 
 ### Express REST API — port 5000
 
-| Method | Path | Auth | Description |
-|---|---|---|---|
-| `POST` | `/api/auth/register` | No | Create account |
-| `POST` | `/api/auth/login` | No | Sign in — returns JWT |
-| `GET` | `/api/auth/me` | Yes | Current user profile |
-| `PATCH` | `/api/auth/profile` | Yes | Update profile fields |
-| `POST` | `/api/expenses` | Yes | Add one expense entry |
-| `GET` | `/api/expenses?month=&category=` | Yes | List entries with filters |
-| `GET` | `/api/expenses/summary?month=` | Yes | Aggregated totals by category |
-| `GET` | `/api/expenses/daily?month=` | Yes | Day-by-day spending for chart |
-| `PATCH` | `/api/expenses/:id` | Yes | Edit entry |
-| `DELETE` | `/api/expenses/:id` | Yes | Delete entry |
-| `GET` | `/api/budget?month=` | Yes | Get monthly budget |
-| `PUT` | `/api/budget` | Yes | Upsert monthly budget |
-| `POST` | `/api/analysis/run` | Yes | Aggregate expenses → run ML → save result |
-| `GET` | `/api/analysis/:month` | Yes | Get saved analysis for a month |
-| `GET` | `/api/analysis` | Yes | List all analyses (for trend chart) |
-| `GET` | `/api/health` | No | Health check |
+| Method   | Path                             | Auth | Description                               |
+| -------- | -------------------------------- | ---- | ----------------------------------------- |
+| `POST`   | `/api/auth/register`             | No   | Create account                            |
+| `POST`   | `/api/auth/login`                | No   | Sign in — returns JWT                     |
+| `GET`    | `/api/auth/me`                   | Yes  | Current user profile                      |
+| `PATCH`  | `/api/auth/profile`              | Yes  | Update profile fields                     |
+| `POST`   | `/api/expenses`                  | Yes  | Add one expense entry                     |
+| `GET`    | `/api/expenses?month=&category=` | Yes  | List entries with filters                 |
+| `GET`    | `/api/expenses/summary?month=`   | Yes  | Aggregated totals by category             |
+| `GET`    | `/api/expenses/daily?month=`     | Yes  | Day-by-day spending for chart             |
+| `PATCH`  | `/api/expenses/:id`              | Yes  | Edit entry                                |
+| `DELETE` | `/api/expenses/:id`              | Yes  | Delete entry                              |
+| `GET`    | `/api/budget?month=`             | Yes  | Get monthly budget                        |
+| `PUT`    | `/api/budget`                    | Yes  | Upsert monthly budget                     |
+| `POST`   | `/api/analysis/run`              | Yes  | Aggregate expenses → run ML → save result |
+| `GET`    | `/api/analysis/:month`           | Yes  | Get saved analysis for a month            |
+| `GET`    | `/api/analysis`                  | Yes  | List all analyses (for trend chart)       |
+| `GET`    | `/api/health`                    | No   | Health check                              |
 
 ### FastAPI ML Service — port 8000
 
-| Method | Path | Description |
-|---|---|---|
+| Method | Path       | Description                                                           |
+| ------ | ---------- | --------------------------------------------------------------------- |
 | `POST` | `/predict` | Accepts `{features: {...}}` → returns FT, XGB, ensemble scores + SHAP |
-| `GET` | `/health` | Model load status, device, feature count |
-| `GET` | `/models` | Training report — MAE, R², ensemble weights |
+| `GET`  | `/health`  | Model load status, device, feature count                              |
+| `GET`  | `/models`  | Training report — MAE, R², ensemble weights                           |
 
 ---
 
@@ -369,12 +391,12 @@ Browser opens automatically at **http://localhost:3000**
 
 You need **4 tabs open** every time you run the app:
 
-| Tab | Command | Directory | Note |
-|---|---|---|---|
-| 1 | `mongod` | anywhere | Keep running |
-| 2 | `uvicorn ml.service:app --host 0.0.0.0 --port 8000 --reload` | `backend/` | Must have `(venv)` active |
-| 3 | `npm run dev` | `backend/` | Express API |
-| 4 | `npm start` | `frontend/` | React dev server |
+| Tab | Command                                                      | Directory   | Note                      |
+| --- | ------------------------------------------------------------ | ----------- | ------------------------- |
+| 1   | `mongod`                                                     | anywhere    | Keep running              |
+| 2   | `uvicorn ml.service:app --host 0.0.0.0 --port 8000 --reload` | `backend/`  | Must have `(venv)` active |
+| 3   | `npm run dev`                                                | `backend/`  | Express API               |
+| 4   | `npm start`                                                  | `frontend/` | React dev server          |
 
 > Each time you restart your computer, re-activate the venv in Tab 2 before starting uvicorn.
 
@@ -401,12 +423,12 @@ JWT_EXPIRES_IN=7d
 ML_SERVICE_URL=http://localhost:8000
 ```
 
-| Variable | Required | Note |
-|---|---|---|
-| `JWT_SECRET` | ✅ Yes | Any long random string — app won't start without it |
-| `MONGO_URI` | ✅ Yes | Default points to local MongoDB |
-| `ML_SERVICE_URL` | ⚠️ Optional | Defaults to `http://localhost:8000` |
-| `PORT` | ⚠️ Optional | Defaults to `5000` |
+| Variable         | Required    | Note                                                |
+| ---------------- | ----------- | --------------------------------------------------- |
+| `JWT_SECRET`     | ✅ Yes      | Any long random string — app won't start without it |
+| `MONGO_URI`      | ✅ Yes      | Default points to local MongoDB                     |
+| `ML_SERVICE_URL` | ⚠️ Optional | Defaults to `http://localhost:8000`                 |
+| `PORT`           | ⚠️ Optional | Defaults to `5000`                                  |
 
 > **Without the ML service running:** the backend falls back to a rule-based stress score automatically — no crash.
 
@@ -438,14 +460,14 @@ ML_SERVICE_URL=http://localhost:8000
 
 ### 🔬 Analysis (6 tabs)
 
-| Tab | What it shows |
-|---|---|
-| **Stress Score** | Three model rings: FT-Transformer, XGBoost, Ensemble. XGB class probability bars |
+| Tab                | What it shows                                                                            |
+| ------------------ | ---------------------------------------------------------------------------------------- |
+| **Stress Score**   | Three model rings: FT-Transformer, XGBoost, Ensemble. XGB class probability bars         |
 | **SHAP Explainer** | Waterfall bar chart — red increases stress, green decreases it. Base value + top factors |
-| **Spending** | Donut chart of category breakdown with percentages of total |
-| **vs Budget** | Horizontal grouped bar chart — your spending vs targets |
-| **Trends** | Line chart + monthly history table with score and net gap per month |
-| **Suggestions** | Up to 7 rule-based personalised tips with potential monthly savings |
+| **Spending**       | Donut chart of category breakdown with percentages of total                              |
+| **vs Budget**      | Horizontal grouped bar chart — your spending vs targets                                  |
+| **Trends**         | Line chart + monthly history table with score and net gap per month                      |
+| **Suggestions**    | Up to 7 rule-based personalised tips with potential monthly savings                      |
 
 ### Fallback mode
 
@@ -461,15 +483,15 @@ SHAP values will be empty but all other features (tracker, budget, suggestions) 
 
 ## Troubleshooting
 
-| Error | Cause | Fix |
-|---|---|---|
-| `secretOrPrivateKey must have a value` | `JWT_SECRET` missing from `.env` | Add `JWT_SECRET=...` to `backend/.env` |
-| `MongoServerError: connect ECONNREFUSED` | MongoDB not running | Run `mongod` in a separate terminal |
-| `ML service unavailable` | uvicorn not started or models not trained | Run `train.py` first, then start uvicorn |
-| `No data for this month` | No expenses logged yet | Add entries in the Tracker before running analysis |
-| `Port already in use` | Previous process still running | Run `npx kill-port 5000` or `npx kill-port 8000` |
-| `(venv)` not shown in terminal | Virtual env not activated | Run `venv\Scripts\activate` (Win) or `source venv/bin/activate` (Mac/Linux) |
-| `Cannot read properties of undefined (reading 'slice')` | API returned non-array before data loaded | Ensure backend is running on port 5000 and MongoDB is connected |
+| Error                                                   | Cause                                     | Fix                                                                         |
+| ------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------- |
+| `secretOrPrivateKey must have a value`                  | `JWT_SECRET` missing from `.env`          | Add `JWT_SECRET=...` to `backend/.env`                                      |
+| `MongoServerError: connect ECONNREFUSED`                | MongoDB not running                       | Run `mongod` in a separate terminal                                         |
+| `ML service unavailable`                                | uvicorn not started or models not trained | Run `train.py` first, then start uvicorn                                    |
+| `No data for this month`                                | No expenses logged yet                    | Add entries in the Tracker before running analysis                          |
+| `Port already in use`                                   | Previous process still running            | Run `npx kill-port 5000` or `npx kill-port 8000`                            |
+| `(venv)` not shown in terminal                          | Virtual env not activated                 | Run `venv\Scripts\activate` (Win) or `source venv/bin/activate` (Mac/Linux) |
+| `Cannot read properties of undefined (reading 'slice')` | API returned non-array before data loaded | Ensure backend is running on port 5000 and MongoDB is connected             |
 
 ---
 
